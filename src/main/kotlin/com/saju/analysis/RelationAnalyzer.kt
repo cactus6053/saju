@@ -115,6 +115,31 @@ class RelationAnalyzer {
         return relations.distinct()
     }
 
+    // 임의의 두 간지 사이 관계 (세운-대운 등 기둥 외 관계 분석용)
+    data class GanJiRelation(
+        val type: RelationType,
+        val resultElement: Element? = null,
+    )
+
+    fun relationsBetween(a: GanJi, b: GanJi): List<GanJiRelation> {
+        val result = mutableListOf<GanJiRelation>()
+        GanRelation.hapOf(a.gan, b.gan)?.let {
+            result += GanJiRelation(RelationType.GAN_HAP, it.resultElement)
+        }
+        if (GanRelation.isChung(a.gan, b.gan)) result += GanJiRelation(RelationType.GAN_CHUNG)
+        JiRelation.yukHapOf(a.ji, b.ji)?.let {
+            result += GanJiRelation(RelationType.YUK_HAP, it.resultElement)
+        }
+        JiRelation.banHapOf(a.ji, b.ji)?.let {
+            result += GanJiRelation(RelationType.BAN_HAP, it.resultElement)
+        }
+        if (JiRelation.isChung(a.ji, b.ji)) result += GanJiRelation(RelationType.YUK_CHUNG)
+        if (JiRelation.isHyeong(a.ji, b.ji)) result += GanJiRelation(RelationType.HYEONG)
+        if (JiRelation.isPa(a.ji, b.ji)) result += GanJiRelation(RelationType.PA)
+        if (JiRelation.isHae(a.ji, b.ji)) result += GanJiRelation(RelationType.HAE)
+        return result
+    }
+
     private fun ganPairRelations(a: GanJi, b: GanJi, pos: Set<PillarPosition>): List<PillarRelation> {
         val result = mutableListOf<PillarRelation>()
         GanRelation.hapOf(a.gan, b.gan)?.let {
