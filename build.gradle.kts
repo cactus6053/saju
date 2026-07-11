@@ -3,6 +3,7 @@ plugins {
     kotlin("plugin.spring") version "2.1.21"
     id("org.springframework.boot") version "3.4.7"
     id("io.spring.dependency-management") version "1.1.7"
+    jacoco
 }
 
 group = "com.saju"
@@ -34,4 +35,37 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+// 커버리지 측정에서 부트스트랩 클래스 제외
+val coverageExclusions = listOf("com/saju/SajuApplication*")
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(
+        classDirectories.files.map { fileTree(it) { exclude(coverageExclusions) } }
+    )
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.jacocoTestReport)
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+    classDirectories.setFrom(
+        classDirectories.files.map { fileTree(it) { exclude(coverageExclusions) } }
+    )
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
 }
