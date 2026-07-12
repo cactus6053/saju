@@ -46,6 +46,13 @@ class AnthropicReadingGenerator(
 
         val response = anthropic.messages().create(params)
 
+        // 토큰 한도로 잘린 미완성 해석문이 영구 캐시에 저장되는 것을 방지
+        if (response.stopReason().map { it == com.anthropic.models.messages.StopReason.MAX_TOKENS }.orElse(false)) {
+            throw ReadingGenerationException(
+                "해석문 생성이 토큰 한도에서 잘렸습니다 (max-tokens=$maxTokens). 잠시 후 다시 시도해주세요."
+            )
+        }
+
         return response.content().stream()
             .flatMap { block -> block.text().stream() }
             .map { it.text() }
@@ -71,7 +78,11 @@ class AnthropicReadingGenerator(
             - 마크다운 사용, 섹션 제목은 굵은 글씨.
             - 단정적 예언이 아니라 "~하는 흐름", "~에 유리한 구조" 같은 경향 서술.
             - 전문용어는 사용하되 짧은 풀이를 곁들입니다. 예: "편관(나를 압박하는 책임의 별)".
+            - 12운성의 사(死)·묘(墓)·절(絶) 등은 죽음의 직역이 아니라 에너지가
+              고요해지는 단계의 은유입니다. "죽음에 가깝다" 같은 표현으로 겁주지 말고
+              "숙성", "내면으로 향하는 힘" 같은 순화된 언어로 풀어냅니다.
             - 과도한 공포 조장이나 미신적 단정을 피하고, 실용적 조언으로 마무리합니다.
+            - 지시된 분량을 넘기지 말고, 반드시 완결된 문장으로 마무리합니다.
         """.trimIndent()
     }
 }

@@ -25,4 +25,9 @@ class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
     fun handleReadingUnavailable(e: com.saju.reading.ReadingUnavailableException): ErrorResponse =
         ErrorResponse(e.message ?: "LLM 해석 서비스를 사용할 수 없습니다")
+
+    @ExceptionHandler(com.saju.reading.ReadingGenerationException::class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    fun handleReadingGeneration(e: com.saju.reading.ReadingGenerationException): ErrorResponse =
+        ErrorResponse(e.message ?: "해석문 생성에 실패했습니다")
 }

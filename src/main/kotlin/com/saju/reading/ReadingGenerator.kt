@@ -9,3 +9,6 @@ interface ReadingGenerator {
 }
 
 class ReadingUnavailableException(message: String) : RuntimeException(message)
+
+// 생성은 됐지만 결과가 불완전한 경우 (토큰 한도 절단 등) — 캐시 저장 방지용
+class ReadingGenerationException(message: String) : RuntimeException(message)
