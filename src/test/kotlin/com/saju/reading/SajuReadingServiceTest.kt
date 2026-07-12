@@ -255,6 +255,19 @@ class SajuReadingServiceTest(
     }
 
     @Test
+    fun `저장 시 kind가 종류별로 기록된다`() {
+        given(generator.generate(anyString())).willReturn("한 줄\n\n메시지")
+
+        val daily = service.getDailyReading(input, java.time.LocalDate.now())
+        val wonguk = service.getWongukReading(input)
+        val yearly = service.getReading(input, 2026)
+
+        assertEquals(ReadingKind.DAILY, repository.findByCacheKey(daily.cacheKey)?.kind)
+        assertEquals(ReadingKind.WONGUK, repository.findByCacheKey(wonguk.cacheKey)?.kind)
+        assertEquals(ReadingKind.YEARLY, repository.findByCacheKey(yearly.cacheKey)?.kind)
+    }
+
+    @Test
     fun `프롬프트는 결정적 - 같은 입력이면 항상 같은 캐시 키`() {
         given(generator.generate(anyString())).willReturn("해석문")
 
