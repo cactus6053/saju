@@ -16,3 +16,6 @@ out/
 # Spring Boot
 *.log
 application-local.yml
+
+# Secrets
+.kasi-api-key
