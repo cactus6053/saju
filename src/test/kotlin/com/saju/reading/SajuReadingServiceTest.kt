@@ -157,7 +157,7 @@ class SajuReadingServiceTest(
     }
 
     @Test
-    fun `주제별 해석은 서로 다른 캐시 키 - 종합·금전·직장·건강`() {
+    fun `주제별 해석은 서로 다른 캐시 키 - 종합·금전·직장·건강·애정`() {
         given(generator.generate(anyString())).willReturn("해석문")
 
         val keys = ReadingTopic.entries.map { topic ->

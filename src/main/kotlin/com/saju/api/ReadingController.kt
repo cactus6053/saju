@@ -83,13 +83,13 @@ class ReadingController(
         @RequestBody request: BirthRequest,
         @Parameter(description = "해석 대상 연도", example = "2026")
         @PathVariable year: Int,
-        @Parameter(description = "해석 주제 (general: 종합, money: 금전운, career: 직장운, health: 건강운)", example = "general")
+        @Parameter(description = "해석 주제 (general: 종합, money: 금전운, career: 직장운, health: 건강운, love: 애정운)", example = "general")
         @RequestParam(defaultValue = "general") topic: String,
     ): ReadingResponse {
         val parsedTopic = runCatching { ReadingTopic.valueOf(topic.uppercase()) }
             .getOrElse {
                 throw IllegalArgumentException(
-                    "지원하지 않는 topic입니다: $topic (사용 가능: general, money, career, health)"
+                    "지원하지 않는 topic입니다: $topic (사용 가능: general, money, career, health, love)"
                 )
             }
         return readingService.getReading(request.toBirthInput(), year, parsedTopic).toResponse()

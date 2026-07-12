@@ -180,7 +180,7 @@ curl -X POST localhost:8080/api/v1/saju/daeun \
 | `POST /api/v1/saju/reading/daeun` | 대운 풀이 | 10대운의 십성·12운성·원국 관계 기반 인생 흐름 |
 | `POST /api/v1/saju/reading/marriage` | 결혼운 | 배우자성·배우자궁 상태 + 향후 10년 세운 스캔으로 시기 해석 |
 | `POST /api/v1/saju/reading/{year}` | 연도별 운세 | 세운 주제, 대운·원국 관계, 삼재, 월별 흐름 |
-| `POST /api/v1/saju/reading/{year}?topic=` | 주제별 운세 | `money`(금전) · `career`(직장) · `health`(건강) |
+| `POST /api/v1/saju/reading/{year}?topic=` | 주제별 운세 | `money`(금전) · `career`(직장) · `health`(건강) · `love`(애정) |
 
 요청 본문은 계산 API와 동일한 `BirthRequest`입니다.
 

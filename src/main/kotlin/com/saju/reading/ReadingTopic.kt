@@ -6,4 +6,5 @@ enum class ReadingTopic(val hangul: String) {
     MONEY("금전운"),
     CAREER("직장운"),
     HEALTH("건강운"),
+    LOVE("애정운"),
 }

@@ -105,13 +105,26 @@ class ReadingControllerTest(
     }
 
     @Test
-    fun `잘못된 topic - 400과 사용 가능 값 안내`() {
+    fun `애정운 해석 - topic=love`() {
+        given(generator.generate(anyString())).willReturn("올해 연애의 기류는...")
+
         mockMvc.post("/api/v1/saju/reading/2026?topic=love") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
+            status { isOk() }
+            jsonPath("$.reading") { value(containsString("연애의 기류")) }
+        }
+    }
+
+    @Test
+    fun `잘못된 topic - 400과 사용 가능 값 안내`() {
+        mockMvc.post("/api/v1/saju/reading/2026?topic=luck") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
             status { isBadRequest() }
-            jsonPath("$.message") { value(containsString("love")) }
+            jsonPath("$.message") { value(containsString("luck")) }
             jsonPath("$.message") { value(containsString("general")) }
         }
     }
