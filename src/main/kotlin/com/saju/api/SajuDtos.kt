@@ -1,0 +1,217 @@
+package com.saju.api
+
+import com.saju.analysis.ElementStrengthAnalyzer
+import com.saju.analysis.FortuneService
+import com.saju.analysis.GyeokGukResult
+import com.saju.analysis.PillarRelation
+import com.saju.analysis.RelationAnalyzer
+import com.saju.analysis.SeunCalculator
+import com.saju.analysis.SinSalHit
+import com.saju.analysis.SipSeongAnalyzer
+import com.saju.analysis.UnRelation
+import com.saju.analysis.WolunCalculator
+import com.saju.domain.core.GanJi
+import com.saju.domain.core.Gender
+import com.saju.engine.BirthInput
+import com.saju.engine.CalendarType
+import com.saju.engine.DaeunCalculator
+import com.saju.engine.TimeCorrectionMode
+import com.saju.engine.TimeCorrector
+import com.saju.engine.ZasiMode
+
+// ── 요청 ────────────────────────────────────────────────────────────────
+
+data class BirthRequest(
+    val year: Int,
+    val month: Int,
+    val day: Int,
+    val hour: Int,
+    val minute: Int = 0,
+    val calendarType: CalendarType = CalendarType.SOLAR,
+    val isLeapMonth: Boolean = false,
+    val gender: Gender,
+    val longitude: Double = TimeCorrector.SEOUL_LONGITUDE,
+    val timeCorrectionMode: TimeCorrectionMode = TimeCorrectionMode.STANDARD,
+    val zasiMode: ZasiMode = ZasiMode.YAJASI_JEONGJASI,
+) {
+    fun toBirthInput() = BirthInput(
+        year, month, day, hour, minute,
+        calendarType, isLeapMonth, gender, longitude, timeCorrectionMode, zasiMode,
+    )
+}
+
+// ── 공통 ────────────────────────────────────────────────────────────────
+
+data class GanJiDto(val hanja: String, val hangul: String)
+
+fun GanJi.toDto() = GanJiDto(hanja, hangul)
+
+data class RelationDto(
+    val type: String,
+    val positions: List<String>,
+    val resultElement: String?,
+)
+
+fun PillarRelation.toDto() = RelationDto(
+    type.hangul, positions.map { it.hangul }, resultElement?.hangul,
+)
+
+fun UnRelation.toDto() = RelationDto(
+    type.hangul, positions.map { it.hangul }, resultElement?.hangul,
+)
+
+fun RelationAnalyzer.GanJiRelation.toDto() = RelationDto(
+    type.hangul, emptyList(), resultElement?.hangul,
+)
+
+// ── 원국 + 분석 응답 ────────────────────────────────────────────────────
+
+data class SajuResponse(
+    val sajuYear: Int,
+    val yearPillar: GanJiDto,
+    val monthPillar: GanJiDto,
+    val dayPillar: GanJiDto,
+    val hourPillar: GanJiDto,
+    val dayMaster: String,
+    val paljaHanja: String,
+    val paljaHangul: String,
+    val sipSeong: SipSeongDto,
+    val gyeokGuk: GyeokGukDto,
+    val elementStrength: ElementStrengthDto,
+    val sinSal: List<SinSalDto>,
+    val relations: List<RelationDto>,
+)
+
+data class PillarSipSeongDto(
+    val gan: String?,
+    val jiPrincipal: String,
+    val jiJanggan: List<String>,
+)
+
+data class SipSeongDto(
+    val year: PillarSipSeongDto,
+    val month: PillarSipSeongDto,
+    val day: PillarSipSeongDto,
+    val hour: PillarSipSeongDto,
+)
+
+fun SipSeongAnalyzer.SajuSipSeong.toDto(): SipSeongDto {
+    fun SipSeongAnalyzer.PillarSipSeong.toDto() = PillarSipSeongDto(
+        gan?.hangul, jiPrincipal.hangul, jiJanggan.map { it.hangul },
+    )
+    return SipSeongDto(year.toDto(), month.toDto(), day.toDto(), hour.toDto())
+}
+
+data class GyeokGukDto(
+    val name: String,
+    val category: String,
+    val yongsin: String,
+    val johuYongsin: String?,
+    val isSinGang: Boolean,
+)
+
+fun GyeokGukResult.toDto() = GyeokGukDto(
+    gyeokGuk.hangul, gyeokGuk.category.name, yongsin.hangul, johuYongsin?.hangul, isSinGang,
+)
+
+data class ElementStrengthDto(
+    val scores: Map<String, Double>,
+    val supportScore: Double,
+    val opposeScore: Double,
+    val isSinGang: Boolean,
+    val excessive: List<String>,
+    val deficient: List<String>,
+)
+
+fun ElementStrengthAnalyzer.ElementStrength.toDto() = ElementStrengthDto(
+    scores = scores.entries.associate { it.key.hangul to it.value },
+    supportScore = supportScore,
+    opposeScore = opposeScore,
+    isSinGang = isSinGang,
+    excessive = excessive.map { it.hangul },
+    deficient = deficient.map { it.hangul },
+)
+
+data class SinSalDto(
+    val name: String,
+    val position: String,
+    val isGilsin: Boolean,
+)
+
+fun SinSalHit.toDto() = SinSalDto(sinSal.hangul, position.hangul, sinSal.isGilsin)
+
+// ── 운세 응답 ───────────────────────────────────────────────────────────
+
+data class FortuneResponse(
+    val year: Int,
+    val age: Int,
+    val currentDaeun: DaeunDto?,
+    val daeunRelations: List<RelationDto>,
+    val seun: SeunDto,
+    val wolunList: List<WolunDto>,
+)
+
+data class DaeunDto(
+    val order: Int,
+    val ganJi: GanJiDto,
+    val startAge: Int,
+    val endAge: Int,
+)
+
+fun DaeunCalculator.Daeun.toDto() = DaeunDto(order, ganJi.toDto(), startAge, endAge)
+
+data class SeunDto(
+    val ganJi: GanJiDto,
+    val ganSipSeong: String,
+    val jiSipSeong: String,
+    val relationsWithWonguk: List<RelationDto>,
+    val relationsWithDaeun: List<RelationDto>,
+)
+
+fun SeunCalculator.SeunResult.toDto() = SeunDto(
+    ganJi.toDto(), ganSipSeong.hangul, jiSipSeong.hangul,
+    relationsWithWonguk.map { it.toDto() },
+    relationsWithDaeun.map { it.toDto() },
+)
+
+data class WolunDto(
+    val month: Int,
+    val ganJi: GanJiDto,
+    val ganSipSeong: String,
+    val jiSipSeong: String,
+    val gilHyung: String,
+    val isSamjae: Boolean,
+    val relationsWithWonguk: List<RelationDto>,
+    val relationsWithSeun: List<RelationDto>,
+    val relationsWithDaeun: List<RelationDto>,
+)
+
+fun WolunCalculator.WolunResult.toDto() = WolunDto(
+    month, ganJi.toDto(), ganSipSeong.hangul, jiSipSeong.hangul,
+    gilHyung.hangul, isSamjae,
+    relationsWithWonguk.map { it.toDto() },
+    relationsWithSeun.map { it.toDto() },
+    relationsWithDaeun.map { it.toDto() },
+)
+
+fun FortuneService.YearlyFortune.toDto() = FortuneResponse(
+    year = year,
+    age = age,
+    currentDaeun = currentDaeun?.toDto(),
+    daeunRelations = daeunRelations.map { it.toDto() },
+    seun = seun.toDto(),
+    wolunList = wolunList.map { it.toDto() },
+)
+
+data class DaeunTimelineResponse(
+    val daeunList: List<DaeunTimelineEntryDto>,
+)
+
+data class DaeunTimelineEntryDto(
+    val daeun: DaeunDto,
+    val relationsWithWonguk: List<RelationDto>,
+)
+
+fun List<FortuneService.DaeunFortune>.toTimelineDto() = DaeunTimelineResponse(
+    map { DaeunTimelineEntryDto(it.daeun.toDto(), it.relationsWithWonguk.map { r -> r.toDto() }) }
+)
