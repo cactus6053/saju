@@ -1,3 +1,16 @@
 spring:
   application:
     name: saju
+  datasource:
+    url: ${DB_URL:jdbc:mariadb://localhost:3306/saju}
+    username: ${DB_USERNAME:saju}
+    password: ${DB_PASSWORD:saju}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY:}
+  model: claude-haiku-4-5
+  max-tokens: 2000

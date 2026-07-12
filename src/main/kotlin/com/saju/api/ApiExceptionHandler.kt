@@ -20,4 +20,9 @@ class ApiExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     fun handleUnreadable(e: HttpMessageNotReadableException): ErrorResponse =
         ErrorResponse("요청 본문을 해석할 수 없습니다: 필수 필드(year, month, day, hour, gender)를 확인하세요")
+
+    @ExceptionHandler(com.saju.reading.ReadingUnavailableException::class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    fun handleReadingUnavailable(e: com.saju.reading.ReadingUnavailableException): ErrorResponse =
+        ErrorResponse(e.message ?: "LLM 해석 서비스를 사용할 수 없습니다")
 }

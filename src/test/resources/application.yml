@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:saju;MODE=MariaDB;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+anthropic:
+  api-key: ""
+  model: claude-haiku-4-5
+  max-tokens: 2000
