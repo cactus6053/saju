@@ -63,6 +63,35 @@ class ReadingControllerTest(
     }
 
     @Test
+    fun `원국 풀이 - POST reading (연도 없음)`() {
+        given(generator.generate(anyString())).willReturn("일간 계수의 평생사주는...")
+
+        mockMvc.post("/api/v1/saju/reading") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reading") { value(containsString("평생사주")) }
+            jsonPath("$.cached") { value(false) }
+        }
+    }
+
+    @Test
+    fun `대운 풀이 - daeun 경로가 year 변수에 삼켜지지 않음`() {
+        given(generator.generate(anyString())).willReturn("대운의 흐름은...")
+
+        // /reading/daeun이 /reading/{year}로 매칭되면 Int 변환 실패로 400이 남 —
+        // 200이면 라우팅이 정확함
+        mockMvc.post("/api/v1/saju/reading/daeun") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reading") { value(containsString("대운의 흐름")) }
+        }
+    }
+
+    @Test
     fun `LLM 미구성 + 캐시 미스 - 503과 안내 메시지`() {
         given(generator.generate(anyString()))
             .willThrow(ReadingUnavailableException("LLM 해석이 구성되지 않았습니다: ANTHROPIC_API_KEY 환경변수를 설정하세요"))

@@ -27,6 +27,32 @@ class ReadingController(
 ) {
 
     @Operation(
+        summary = "원국 풀이 (평생사주)",
+        description = "성격·기질·격국·용신·오행 균형·신살·적성 해석. 연도 무관이라 같은 사주는 영구 재사용됩니다.",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "해석 성공"),
+        ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
+    )
+    @PostMapping
+    fun wonguk(@RequestBody request: BirthRequest): ReadingResponse =
+        readingService.getWongukReading(request.toBirthInput()).toResponse()
+
+    @Operation(
+        summary = "대운 풀이 (10년 단위 인생 흐름)",
+        description = "10개 대운의 십성·12운성·원국 관계를 근거로 인생 흐름을 해석합니다.",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "해석 성공"),
+        ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
+    )
+    @PostMapping("/daeun")
+    fun daeun(@RequestBody request: BirthRequest): ReadingResponse =
+        readingService.getDaeunReading(request.toBirthInput()).toResponse()
+
+    @Operation(
         summary = "연도별 사주 해석문",
         description = "원국 분석과 해당 연도 운세를 근거로 한국어 해석문을 생성합니다. " +
             "동일 입력의 해석문은 DB에 영구 캐싱되어 재요청 시 LLM 호출 없이 반환됩니다 (cached=true).",
@@ -41,8 +67,8 @@ class ReadingController(
         @RequestBody request: BirthRequest,
         @Parameter(description = "해석 대상 연도", example = "2026")
         @PathVariable year: Int,
-    ): ReadingResponse {
-        val result = readingService.getReading(request.toBirthInput(), year)
-        return ReadingResponse(result.reading, result.model, result.cached, result.cacheKey)
-    }
+    ): ReadingResponse = readingService.getReading(request.toBirthInput(), year).toResponse()
+
+    private fun SajuReadingService.ReadingResult.toResponse() =
+        ReadingResponse(reading, model, cached, cacheKey)
 }

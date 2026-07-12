@@ -111,6 +111,52 @@ class SajuReadingServiceTest(
     }
 
     @Test
+    fun `3종 해석은 서로 다른 캐시 키`() {
+        given(generator.generate(anyString())).willReturn("해석문")
+
+        val wonguk = service.getWongukReading(input)
+        val daeun = service.getDaeunReading(input)
+        val yearly = service.getReading(input, 2026)
+
+        assertEquals(3, setOf(wonguk.cacheKey, daeun.cacheKey, yearly.cacheKey).size)
+        verify(generator, times(3)).generate(anyString())
+    }
+
+    @Test
+    fun `원국 풀이 캐싱 - 재요청 시 LLM 미호출`() {
+        given(generator.generate(anyString())).willReturn("평생사주 해석")
+
+        val first = service.getWongukReading(input)
+        val second = service.getWongukReading(input)
+
+        assertFalse(first.cached)
+        assertTrue(second.cached)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
+    fun `대운 풀이 캐싱 - 재요청 시 LLM 미호출`() {
+        given(generator.generate(anyString())).willReturn("대운 해석")
+
+        val first = service.getDaeunReading(input)
+        val second = service.getDaeunReading(input)
+
+        assertFalse(first.cached)
+        assertTrue(second.cached)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
+    fun `대운 풀이 - 성별이 다르면 다른 캐시 키 (순행 역행)`() {
+        given(generator.generate(anyString())).willReturn("해석문")
+
+        val female = service.getDaeunReading(input)
+        val male = service.getDaeunReading(input.copy(gender = Gender.MALE))
+
+        assertNotEquals(female.cacheKey, male.cacheKey)
+    }
+
+    @Test
     fun `프롬프트는 결정적 - 같은 입력이면 항상 같은 캐시 키`() {
         given(generator.generate(anyString())).willReturn("해석문")
 
