@@ -3,6 +3,7 @@ package com.saju.reading
 import com.saju.analysis.ElementStrengthAnalyzer
 import com.saju.analysis.FortuneService
 import com.saju.analysis.GyeokGukResult
+import com.saju.analysis.IlunCalculator
 import com.saju.analysis.PillarRelation
 import com.saju.analysis.SinSalHit
 import com.saju.analysis.SipSeongAnalyzer
@@ -168,6 +169,35 @@ object ReadingPromptBuilder {
             4. **조언** — 시기에 매이지 않는 관계 조언과 한 줄 요약
 
             분량: 한국어 1000~1400자. 반드시 완결된 문장으로 마무리할 것.
+            """.trimIndent()
+        )
+    }
+
+    // ── 일일 운세 ───────────────────────────────────────────────────────
+
+    // 점수·행운 요소는 엔진(IlunCalculator)이 결정 — LLM은 문구만 생성한다
+    fun buildDaily(data: WongukData, ilun: IlunCalculator.IlunResult): String = buildString {
+        append(wongukBlock(data))
+        appendLine()
+        appendLine("[일운 ${ilun.date}]")
+        appendLine(
+            "일진: ${ilun.ganJi.hanja} ${ilun.ganSipSeong.hangul}/${ilun.jiSipSeong.hangul} " +
+                "12운성 ${ilun.unSeong.hangul}"
+        )
+        appendLine("원국관계: " + formatUnRelations(ilun.relationsWithWonguk))
+        appendLine("오늘 점수: ${ilun.score}/5")
+        appendLine()
+        append(
+            """
+            위 데이터를 근거로 ${ilun.date} 하루 운세를 작성하세요.
+            점수(${ilun.score}/5)의 기조를 따르고, 일진 십성과 합충을 근거로 삼되
+            전문용어는 일상어로 풀어 씁니다.
+
+            출력 형식 (정확히 지킬 것):
+            - 첫 줄: 포토카드용 한 줄 운세 — 30자 이내, 따옴표와 마침표 없이
+            - 빈 줄 하나
+            - 이후: 오늘의 메시지 2~4문장 (200~350자), 완결된 문장으로 끝낼 것
+            마크다운 헤더·목록 없이 순수 문장만 출력합니다.
             """.trimIndent()
         )
     }

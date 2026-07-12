@@ -142,6 +142,67 @@ class ReadingControllerTest(
         }
     }
 
+    // ── 일일 운세 (SajuController /fortune/daily — LLM 목이 필요해 여기서 테스트) ──
+
+    private val dailyLlmOutput = "오늘은 흐름이 좋은 날\n\n오늘의 메시지입니다. 차분히 진행하면 좋은 결과가 있어요."
+
+    @Test
+    fun `일일 운세 - date 생략 시 오늘 기준, 한 줄과 메시지 분리`() {
+        given(generator.generate(anyString())).willReturn(dailyLlmOutput)
+
+        mockMvc.post("/api/v1/saju/fortune/daily") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.date") { value(java.time.LocalDate.now().toString()) }
+            jsonPath("$.oneLiner") { value("오늘은 흐름이 좋은 날") }
+            jsonPath("$.message") { value(containsString("차분히")) }
+            jsonPath("$.ilJin.hanja") { isNotEmpty() }
+            jsonPath("$.score") { isNumber() }
+            jsonPath("$.lucky.colorHangul") { isNotEmpty() }
+            jsonPath("$.lucky.number") { isNumber() }
+            jsonPath("$.lucky.itemHangul") { isNotEmpty() }
+            jsonPath("$.cached") { value(false) }
+        }
+    }
+
+    @Test
+    fun `일일 운세 - 내일까지는 허용`() {
+        given(generator.generate(anyString())).willReturn(dailyLlmOutput)
+
+        val tomorrow = java.time.LocalDate.now().plusDays(1)
+        mockMvc.post("/api/v1/saju/fortune/daily?date=$tomorrow") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.date") { value(tomorrow.toString()) }
+        }
+    }
+
+    @Test
+    fun `일일 운세 - 모레 이후는 400`() {
+        val dayAfterTomorrow = java.time.LocalDate.now().plusDays(2)
+        mockMvc.post("/api/v1/saju/fortune/daily?date=$dayAfterTomorrow") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.message") { value(containsString("내일까지만")) }
+        }
+    }
+
+    @Test
+    fun `일일 운세 - 잘못된 날짜 형식은 400`() {
+        mockMvc.post("/api/v1/saju/fortune/daily?date=2026-13-99") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
     @Test
     fun `LLM 미구성 + 캐시 미스 - 503과 안내 메시지`() {
         given(generator.generate(anyString()))

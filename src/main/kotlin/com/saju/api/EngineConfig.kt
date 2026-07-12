@@ -3,6 +3,7 @@ package com.saju.api
 import com.saju.analysis.ElementStrengthAnalyzer
 import com.saju.analysis.FortuneService
 import com.saju.analysis.GyeokGukAnalyzer
+import com.saju.analysis.IlunCalculator
 import com.saju.analysis.RelationAnalyzer
 import com.saju.analysis.SinSalAnalyzer
 import com.saju.analysis.SipSeongAnalyzer
@@ -33,4 +34,7 @@ class EngineConfig {
 
     @Bean
     fun fortuneService() = FortuneService()
+
+    @Bean
+    fun ilunCalculator() = IlunCalculator()
 }

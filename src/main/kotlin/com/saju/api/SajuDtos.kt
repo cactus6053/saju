@@ -18,6 +18,7 @@ import com.saju.engine.DaeunCalculator
 import com.saju.engine.TimeCorrectionMode
 import com.saju.engine.TimeCorrector
 import com.saju.engine.ZasiMode
+import com.saju.reading.SajuReadingService
 
 // ── 요청 ────────────────────────────────────────────────────────────────
 
@@ -239,4 +240,44 @@ data class DaeunTimelineEntryDto(
 
 fun List<FortuneService.DaeunFortune>.toTimelineDto() = DaeunTimelineResponse(
     map { DaeunTimelineEntryDto(it.daeun.toDto(), it.relationsWithWonguk.map { r -> r.toDto() }) }
+)
+
+data class LuckyDto(
+    val color: String,
+    val colorHangul: String,
+    val number: Int,
+    val item: String,
+    val itemHangul: String,
+)
+
+data class DailyFortuneResponse(
+    val date: String,
+    val ilJin: GanJiDto,
+    val ganSipSeong: String,
+    val jiSipSeong: String,
+    val unSeong: String,
+    val score: Int,
+    val oneLiner: String,
+    val message: String,
+    val lucky: LuckyDto,
+    val cached: Boolean,
+)
+
+fun SajuReadingService.DailyReadingResult.toDto() = DailyFortuneResponse(
+    date = ilun.date.toString(),
+    ilJin = ilun.ganJi.toDto(),
+    ganSipSeong = ilun.ganSipSeong.hangul,
+    jiSipSeong = ilun.jiSipSeong.hangul,
+    unSeong = ilun.unSeong.hangul,
+    score = ilun.score,
+    oneLiner = oneLiner,
+    message = message,
+    lucky = LuckyDto(
+        color = ilun.luckyColor.name,
+        colorHangul = ilun.luckyColor.hangul,
+        number = ilun.luckyNumber,
+        item = ilun.luckyItem.name,
+        itemHangul = ilun.luckyItem.hangul,
+    ),
+    cached = cached,
 )

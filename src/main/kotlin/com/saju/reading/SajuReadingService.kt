@@ -3,6 +3,7 @@ package com.saju.reading
 import com.saju.analysis.ElementStrengthAnalyzer
 import com.saju.analysis.FortuneService
 import com.saju.analysis.GyeokGukAnalyzer
+import com.saju.analysis.IlunCalculator
 import com.saju.analysis.RelationAnalyzer
 import com.saju.analysis.SinSalAnalyzer
 import com.saju.analysis.SipSeongAnalyzer
@@ -26,6 +27,7 @@ class SajuReadingService(
     private val sinSalAnalyzer: SinSalAnalyzer,
     private val relationAnalyzer: RelationAnalyzer,
     private val fortuneService: FortuneService,
+    private val ilunCalculator: IlunCalculator,
 ) {
 
     private val unSeongAnalyzer = UnSeongAnalyzer()
@@ -74,6 +76,34 @@ class SajuReadingService(
             scanStartYear = java.time.Year.now().value,
         )
         return cachedGenerate(prompt)
+    }
+
+    data class DailyReadingResult(
+        val ilun: IlunCalculator.IlunResult,
+        val oneLiner: String,
+        val message: String,
+        val cached: Boolean,
+        val cacheKey: String,
+    )
+
+    // 일일 운세 — 점수·행운 요소는 엔진, 한 줄/메시지만 LLM. 미래는 내일까지만 허용
+    fun getDailyReading(input: BirthInput, date: java.time.LocalDate?): DailyReadingResult {
+        val target = date ?: java.time.LocalDate.now()
+        require(!target.isAfter(java.time.LocalDate.now().plusDays(1))) {
+            "일일 운세는 내일까지만 조회할 수 있습니다: $target"
+        }
+
+        val saju = sajuCalculator.calculate(input)
+        val data = wongukData(saju)
+        val ilun = ilunCalculator.analyze(saju, data.gyeokGuk, target)
+        val result = cachedGenerate(ReadingPromptBuilder.buildDaily(data, ilun))
+
+        // 첫 줄 = 포토카드 한 줄, 나머지 = 메시지 (프롬프트가 강제하는 형식)
+        val lines = result.reading.trim().lines()
+        val oneLiner = lines.first().trim()
+        val message = lines.drop(1).joinToString("\n").trim().ifEmpty { oneLiner }
+
+        return DailyReadingResult(ilun, oneLiner, message, result.cached, result.cacheKey)
     }
 
     private fun wongukData(saju: SajuResult) = ReadingPromptBuilder.WongukData(

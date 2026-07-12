@@ -205,6 +205,56 @@ class SajuReadingServiceTest(
     }
 
     @Test
+    fun `일일 운세 - 한 줄과 메시지 분리, 캐싱 동작`() {
+        given(generator.generate(anyString()))
+            .willReturn("오늘의 한 줄\n\n오늘의 메시지 첫 문장. 둘째 문장.")
+
+        val today = java.time.LocalDate.now()
+        val first = service.getDailyReading(input, today)
+        val second = service.getDailyReading(input, today)
+
+        assertEquals("오늘의 한 줄", first.oneLiner)
+        assertEquals("오늘의 메시지 첫 문장. 둘째 문장.", first.message)
+        assertEquals(today, first.ilun.date)
+        assertFalse(first.cached)
+        assertTrue(second.cached)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
+    fun `일일 운세 - LLM이 한 줄만 반환하면 메시지로 폴백`() {
+        given(generator.generate(anyString())).willReturn("한 줄 운세만")
+
+        val result = service.getDailyReading(input, java.time.LocalDate.now())
+
+        assertEquals("한 줄 운세만", result.oneLiner)
+        assertEquals("한 줄 운세만", result.message)
+    }
+
+    @Test
+    fun `일일 운세 - 다른 날짜는 다른 캐시 키`() {
+        given(generator.generate(anyString())).willReturn("한 줄\n\n메시지")
+
+        val today = service.getDailyReading(input, java.time.LocalDate.now())
+        val yesterday = service.getDailyReading(input, java.time.LocalDate.now().minusDays(1))
+
+        assertNotEquals(today.cacheKey, yesterday.cacheKey)
+    }
+
+    @Test
+    fun `일일 운세 - date 생략 시 오늘, 모레 이후는 거부`() {
+        given(generator.generate(anyString())).willReturn("한 줄\n\n메시지")
+
+        assertEquals(java.time.LocalDate.now(), service.getDailyReading(input, null).ilun.date)
+
+        assertThrows<IllegalArgumentException> {
+            service.getDailyReading(input, java.time.LocalDate.now().plusDays(2))
+        }
+        // 거부된 요청은 LLM을 호출하지 않음 (오늘 조회 1회만)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
     fun `프롬프트는 결정적 - 같은 입력이면 항상 같은 캐시 키`() {
         given(generator.generate(anyString())).willReturn("해석문")
 
