@@ -21,17 +21,35 @@ import com.saju.engine.ZasiMode
 
 // ── 요청 ────────────────────────────────────────────────────────────────
 
+@io.swagger.v3.oas.annotations.media.Schema(description = "출생 정보")
 data class BirthRequest(
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생 연도 (1900~2100)", example = "2024")
     val year: Int,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생 월 (1~12)", example = "6")
     val month: Int,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생 일", example = "15")
     val day: Int,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생 시 (0~23)", example = "12")
     val hour: Int,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생 분 (0~59)", example = "0", defaultValue = "0")
     val minute: Int = 0,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "달력 종류 (SOLAR: 양력, LUNAR: 음력)", defaultValue = "SOLAR")
     val calendarType: CalendarType = CalendarType.SOLAR,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "음력 윤달 여부 (음력 입력 시에만 사용)", defaultValue = "false")
     val isLeapMonth: Boolean = false,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "성별 (대운 순행/역행 판정에 사용)", example = "MALE")
     val gender: Gender,
+    @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생지 경도 (지방평균시·진태양시 보정용)", defaultValue = "126.978")
     val longitude: Double = TimeCorrector.SEOUL_LONGITUDE,
+    @field:io.swagger.v3.oas.annotations.media.Schema(
+        description = "시간 보정 방식 (STANDARD: 표준시, LOCAL_MEAN_TIME: 지방평균시, APPARENT_SOLAR_TIME: 진태양시)",
+        defaultValue = "STANDARD",
+    )
     val timeCorrectionMode: TimeCorrectionMode = TimeCorrectionMode.STANDARD,
+    @field:io.swagger.v3.oas.annotations.media.Schema(
+        description = "자시 처리 방식 (YAJASI_JEONGJASI: 야자시/정자시 구분, SIMPLE: 23시부터 다음날)",
+        defaultValue = "YAJASI_JEONGJASI",
+    )
     val zasiMode: ZasiMode = ZasiMode.YAJASI_JEONGJASI,
 ) {
     fun toBirthInput() = BirthInput(
