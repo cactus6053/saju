@@ -83,20 +83,20 @@ BirthInput (현지 날짜·시각, 시간대, 성별, 옵션)
 docker run -d -p 3306:3306 -e MARIADB_DATABASE=saju \
   -e MARIADB_USER=saju -e MARIADB_PASSWORD=saju -e MARIADB_ROOT_PASSWORD=root mariadb
 
-ANTHROPIC_API_KEY=sk-ant-... ./gradlew bootRun   # 기본 8080 포트
+ANTHROPIC_API_KEY=sk-ant-... ./gradlew bootRun   # 기본 9600 포트 (SERVER_PORT로 변경 가능)
 ```
 
 - 요구사항: JDK 21+, MariaDB (해석 API 사용 시)
 - 환경변수: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` (기본 localhost/saju/saju),
   `ANTHROPIC_API_KEY` (없으면 계산 API는 정상, 해석 API는 캐시 미스 시 503)
-- API 문서: 서버 실행 후 http://localhost:8080/swagger-ui.html
+- API 문서: 서버 실행 후 http://localhost:9600/swagger-ui.html
 
 ## API 사용법
 
 ### 1. 원국 계산 + 전체 분석
 
 ```bash
-curl -X POST localhost:8080/api/v1/saju \
+curl -X POST localhost:9600/api/v1/saju \
   -H 'Content-Type: application/json' \
   -d '{"year":2024, "month":6, "day":15, "hour":12, "gender":"MALE"}'
 ```
@@ -134,7 +134,7 @@ curl -X POST localhost:8080/api/v1/saju \
 ### 2. 연도별 통합 운세
 
 ```bash
-curl -X POST localhost:8080/api/v1/saju/fortune/2031 \
+curl -X POST localhost:9600/api/v1/saju/fortune/2031 \
   -H 'Content-Type: application/json' \
   -d '{"year":2024, "month":6, "day":15, "hour":12, "gender":"MALE"}'
 ```
@@ -161,7 +161,7 @@ curl -X POST localhost:8080/api/v1/saju/fortune/2031 \
 ### 3. 대운 타임라인
 
 ```bash
-curl -X POST localhost:8080/api/v1/saju/daeun \
+curl -X POST localhost:9600/api/v1/saju/daeun \
   -H 'Content-Type: application/json' \
   -d '{"year":2024, "month":6, "day":15, "hour":12, "gender":"MALE"}'
 ```
@@ -185,7 +185,7 @@ curl -X POST localhost:8080/api/v1/saju/daeun \
 요청 본문은 계산 API와 동일한 `BirthRequest`입니다.
 
 ```bash
-curl -X POST localhost:8080/api/v1/saju/reading/2026 \
+curl -X POST localhost:9600/api/v1/saju/reading/2026 \
   -H 'Content-Type: application/json' \
   -d '{"year":1994, "month":10, "day":24, "hour":12, "minute":14, "gender":"FEMALE"}'
 ```
@@ -228,7 +228,7 @@ curl -X POST localhost:8080/api/v1/saju/reading/2026 \
 
 ```bash
 # 뉴욕 1998-02-05 06:00 현지 시각 출생 — FE는 변환 없이 그대로 전송
-curl -X POST localhost:8080/api/v1/saju \
+curl -X POST localhost:9600/api/v1/saju \
   -H 'Content-Type: application/json' \
   -d '{"year":1998, "month":2, "day":5, "hour":6,
        "gender":"MALE", "timeZone":"America/New_York"}'
