@@ -7,6 +7,7 @@
 - **원국 계산**: 절기 기준 연·월·일·시주 (1900~2100년)
 - **파생 분석**: 십성, 격국·용신, 오행 강약, 신살, 12운성·12신살, 합충형파해
 - **운세 조회**: 대운 타임라인, 세운·월운, 원국과의 관계 분석, 삼재
+- **LLM 해석**: 원국 풀이·대운 풀이·연도별 운세 해석문 3종 (Claude API + MariaDB 영구 캐싱)
 - **입력 옵션**: 양력/음력(윤달), 해외 출생(IANA 시간대), 지방평균시/진태양시 보정, 자시 처리 방식
 - **정밀도**: 절기 시각 평균 ±5분 (KASI 공식값 268건 대조 검증, ΔT 보정 적용)
 
@@ -39,13 +40,22 @@ com.saju
 │   ├── Seun/WolunCalculator            세운·월운 + 삼재·길흉
 │   └── FortuneService                  운세 통합 조회 (진입점)
 │
+├── reading        LLM 해석 (Claude API + 영구 캐싱)
+│   ├── ReadingPromptBuilder            엔진 출력 → 결정적 압축 프롬프트
+│   ├── AnthropicReadingGenerator       anthropic-java SDK, 프롬프트 캐싱
+│   ├── SajuReadingService              캐시 조회 → 미스 시 1회 생성 → 저장
+│   └── SajuReadingEntity/Repository    MariaDB saju_reading 테이블
+│
 └── api            REST 노출
-    ├── SajuController                  3개 엔드포인트
+    ├── SajuController                  계산 API 3개
+    ├── ReadingController               해석 API 3개
     ├── SajuDtos                        요청/응답 DTO (한자·한글 병기)
-    └── ApiExceptionHandler             400 + 한국어 상세 메시지
+    └── ApiExceptionHandler             400/503 + 한국어 상세 메시지
 ```
 
-의존 방향은 아래→위 단방향입니다. 모든 역법 데이터는 공식 또는 1KB 미만 상수 테이블로 메모리에 상주하며, DB가 없습니다.
+의존 방향은 아래→위 단방향입니다. 계산 경로(domain~analysis)는 DB 없이 동작하며
+— 모든 역법 데이터는 공식 또는 1KB 미만 상수 테이블로 메모리에 상주 —
+MariaDB는 해석문 캐시(reading)에만 사용됩니다.
 
 ### 계산 파이프라인
 
@@ -66,12 +76,19 @@ BirthInput (현지 날짜·시각, 시간대, 성별, 옵션)
 ## 빌드 및 실행
 
 ```bash
-./gradlew test        # 전체 테스트 (~700건)
+./gradlew test        # 전체 테스트 (~700건, H2 인메모리 사용 — 외부 의존 없음)
 ./gradlew check       # 테스트 + 커버리지 80% 게이트
-./gradlew bootRun     # 서버 실행 (기본 8080 포트)
+
+# 서버 실행에는 MariaDB 필요 (해석문 캐시용)
+docker run -d -p 3306:3306 -e MARIADB_DATABASE=saju \
+  -e MARIADB_USER=saju -e MARIADB_PASSWORD=saju -e MARIADB_ROOT_PASSWORD=root mariadb
+
+ANTHROPIC_API_KEY=sk-ant-... ./gradlew bootRun   # 기본 8080 포트
 ```
 
-- 요구사항: JDK 21+
+- 요구사항: JDK 21+, MariaDB (해석 API 사용 시)
+- 환경변수: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` (기본 localhost/saju/saju),
+  `ANTHROPIC_API_KEY` (없으면 계산 API는 정상, 해석 API는 캐시 미스 시 503)
 - API 문서: 서버 실행 후 http://localhost:8080/swagger-ui.html
 
 ## API 사용법
@@ -150,6 +167,47 @@ curl -X POST localhost:8080/api/v1/saju/daeun \
 ```
 
 10개 대운의 간지·나이 구간과 각 대운-원국 관계를 반환합니다.
+
+### 4. LLM 해석 API 3종
+
+계산 API가 반환하는 데이터(JSON)는 FE의 만세력 화면 렌더링용이고, 사용자가 읽을
+해석문은 아래 3종이 담당합니다. Claude(Haiku)가 엔진 계산값만 근거로 생성하며,
+결과는 MariaDB에 영구 캐싱됩니다.
+
+| 엔드포인트 | 해석 | 내용 |
+|---|---|---|
+| `POST /api/v1/saju/reading` | 원국 풀이 (평생사주) | 일간·기질, 격국·용신, 오행 균형, 신살, 적성 |
+| `POST /api/v1/saju/reading/daeun` | 대운 풀이 | 10대운의 십성·12운성·원국 관계 기반 인생 흐름 |
+| `POST /api/v1/saju/reading/{year}` | 연도별 운세 | 세운 주제, 대운·원국 관계, 삼재, 월별 흐름 |
+
+요청 본문은 계산 API와 동일한 `BirthRequest`입니다.
+
+```bash
+curl -X POST localhost:8080/api/v1/saju/reading/2026 \
+  -H 'Content-Type: application/json' \
+  -d '{"year":1994, "month":10, "day":24, "hour":12, "minute":14, "gender":"FEMALE"}'
+```
+
+```jsonc
+{
+  "reading": "## 원국 개관\n일간 계수(癸水)는 ...",  // 마크다운 해석문
+  "model": "claude-haiku-4-5",
+  "cached": false,      // 첫 생성 — 재요청 시 true (LLM 호출 없음)
+  "cacheKey": "3f2a..." // SHA-256(모델 + 엔진 출력)
+}
+```
+
+**캐싱 동작** — 캐시 키가 입력이 아닌 **엔진 계산 결과의 해시**라서,
+사주가 같으면 자동으로 캐시를 공유합니다:
+
+- 12:14 출생과 12:16 출생(같은 시진) → 팔자 동일 → **캐시 공유**
+- 양력 입력과 같은 날짜의 음력 입력 → 변환 후 동일 → **캐시 공유**
+- 같은 팔자라도 성별이 다르면(대운 순행/역행) → **분리**
+- 같은 팔자라도 대운수(기산 나이)가 다르면 대운·연도 해석은 → **분리** (실제로 다른 운세)
+- 엔진 출력이 결정적이므로 캐시는 **만료 없이 영구 유효**
+
+`ANTHROPIC_API_KEY` 미설정 시: 캐시에 있는 해석은 정상 반환되고,
+캐시 미스만 `503` + 안내 메시지를 반환합니다.
 
 ### 요청 필드 (BirthRequest)
 
