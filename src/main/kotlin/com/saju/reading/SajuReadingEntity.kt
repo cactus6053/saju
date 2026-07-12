@@ -5,7 +5,6 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Lob
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.Instant
@@ -27,8 +26,9 @@ class SajuReadingEntity(
     @Column(nullable = false, length = 64)
     val model: String,
 
-    @Lob
-    @Column(nullable = false)
+    // @Lob은 MariaDB에서 기본 길이 255로 TINYTEXT를 생성하는 함정이 있어
+    // 명시적 길이 사용 — MariaDB는 MEDIUMTEXT, H2는 VARCHAR로 매핑됨
+    @Column(nullable = false, length = 1_000_000)
     val content: String,
 
     @Column(name = "created_at", nullable = false)
