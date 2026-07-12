@@ -39,6 +39,13 @@ data class BirthRequest(
     val isLeapMonth: Boolean = false,
     @field:io.swagger.v3.oas.annotations.media.Schema(description = "성별 (대운 순행/역행 판정에 사용)", example = "MALE")
     val gender: Gender,
+    @field:io.swagger.v3.oas.annotations.media.Schema(
+        description = "출생지 IANA 시간대 — 해외 출생 시 현지 시간대 지정 (예: America/New_York). " +
+            "연·월주는 절대 시점, 일·시주는 현지 시각 기준으로 계산됨",
+        defaultValue = "Asia/Seoul",
+        example = "Asia/Seoul",
+    )
+    val timeZone: String = "Asia/Seoul",
     @field:io.swagger.v3.oas.annotations.media.Schema(description = "출생지 경도 (지방평균시·진태양시 보정용)", defaultValue = "126.978")
     val longitude: Double = TimeCorrector.SEOUL_LONGITUDE,
     @field:io.swagger.v3.oas.annotations.media.Schema(
@@ -54,7 +61,7 @@ data class BirthRequest(
 ) {
     fun toBirthInput() = BirthInput(
         year, month, day, hour, minute,
-        calendarType, isLeapMonth, gender, longitude, timeCorrectionMode, zasiMode,
+        calendarType, isLeapMonth, gender, timeZone, longitude, timeCorrectionMode, zasiMode,
     )
 }
 

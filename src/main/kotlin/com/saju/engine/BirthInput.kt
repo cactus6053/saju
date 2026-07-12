@@ -21,15 +21,21 @@ data class BirthInput(
     val calendarType: CalendarType = CalendarType.SOLAR,
     val isLeapMonth: Boolean = false,
     val gender: Gender,
+    val timeZone: String = "Asia/Seoul", // 출생지 IANA 시간대 (해외 출생 지원)
     val longitude: Double = TimeCorrector.SEOUL_LONGITUDE,
     val timeCorrectionMode: TimeCorrectionMode = TimeCorrectionMode.STANDARD,
     val zasiMode: ZasiMode = ZasiMode.YAJASI_JEONGJASI,
 )
 
+// 이중 트랙:
+// - corrected: 출생지 현지 프레임 보정 시각 → 일주·시주 판정 (현지 태양 기준)
+// - instantKst: 절대 시점의 KST 표현 → 연주·월주 판정 (절기 시각과 비교)
+// 한국 출생 STANDARD 모드에서는 두 값이 동일하다.
 data class NormalizedBirth(
-    val solarDate: LocalDate,     // 양력 생년월일 (벽시계 기준)
-    val wallClock: LocalDateTime, // 출생 당시 벽시계 시각
-    val corrected: LocalDateTime, // 보정된 KST 프레임 시각 — 사주 계산의 기준
+    val solarDate: LocalDate,     // 양력 생년월일 (현지 벽시계 기준)
+    val wallClock: LocalDateTime, // 출생 당시 현지 벽시계 시각
+    val corrected: LocalDateTime, // 현지 프레임 보정 시각 — 일주·시주 기준
     val gender: Gender,
     val zasiMode: ZasiMode,
+    val instantKst: LocalDateTime = corrected, // 절대 시점(KST 프레임) — 연주·월주 기준
 )

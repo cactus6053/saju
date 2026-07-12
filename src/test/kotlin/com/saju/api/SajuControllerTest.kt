@@ -49,6 +49,38 @@ class SajuControllerTest(
     }
 
     @Test
+    fun `해외 출생 - 뉴욕 시간대 입력`() {
+        mockMvc.post("/api/v1/saju") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "year": 1998, "month": 2, "day": 5, "hour": 6,
+                  "gender": "MALE", "timeZone": "America/New_York"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.paljaHanja") { value("戊寅 甲寅 癸未 乙卯") }
+        }
+    }
+
+    @Test
+    fun `유효하지 않은 시간대 - 400`() {
+        mockMvc.post("/api/v1/saju") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "year": 1998, "month": 2, "day": 5, "hour": 6,
+                  "gender": "MALE", "timeZone": "Invalid/Zone"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.message") { value(org.hamcrest.Matchers.containsString("Invalid/Zone")) }
+        }
+    }
+
+    @Test
     fun `음력 입력 - 설날 출생`() {
         mockMvc.post("/api/v1/saju") {
             contentType = MediaType.APPLICATION_JSON

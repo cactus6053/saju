@@ -26,7 +26,8 @@ class DaeunStartCalculator(
     // 대운수 = 절입까지 일수 ÷ 3 반올림 (3일 = 1년), 1~10 범위로 제한
     fun calculate(saju: SajuResult): DaeunStart {
         val direction = directionOf(saju)
-        val kst = saju.birth.corrected
+        // 절기까지의 일수는 절대 시점 기준 (연·월주와 동일 프레임)
+        val kst = saju.birth.instantKst
         val sajuMonth = monthBoundaryResolver.resolve(kst)
 
         val (minutes, target) = when (direction) {

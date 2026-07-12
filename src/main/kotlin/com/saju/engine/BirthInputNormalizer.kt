@@ -18,6 +18,12 @@ class BirthInputNormalizer(
     fun normalize(input: BirthInput): NormalizedBirth {
         validateCommon(input)
 
+        val zone = try {
+            java.time.ZoneId.of(input.timeZone)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("유효하지 않은 시간대입니다: ${input.timeZone} (IANA 식별자 필요, 예: Asia/Seoul, America/New_York)", e)
+        }
+
         val solarDate = when (input.calendarType) {
             CalendarType.SOLAR -> toSolarDate(input)
             CalendarType.LUNAR -> lunarConverter.lunarToSolar(
@@ -26,11 +32,12 @@ class BirthInputNormalizer(
         }
 
         val wallClock = solarDate.atTime(input.hour, input.minute)
-        val corrected = timeCorrector.correct(wallClock, input.longitude, input.timeCorrectionMode)
+        val corrected = timeCorrector.correct(wallClock, input.longitude, input.timeCorrectionMode, zone)
+        val instantKst = timeCorrector.toUtc(wallClock, zone).plusHours(9)
 
-        require(corrected in MIN_CORRECTED..MAX_CORRECTED) {
-            "보정된 시각($corrected)이 지원 범위(1900-01-01 ~ 2100-12-31)를 벗어났습니다. " +
-                "경계 날짜 출생은 보정 방식에 따라 범위를 벗어날 수 있습니다."
+        require(corrected in MIN_CORRECTED..MAX_CORRECTED && instantKst in MIN_CORRECTED..MAX_CORRECTED) {
+            "보정된 시각($corrected / KST $instantKst)이 지원 범위(1900-01-01 ~ 2100-12-31)를 벗어났습니다. " +
+                "경계 날짜 출생은 시간대·보정 방식에 따라 범위를 벗어날 수 있습니다."
         }
 
         return NormalizedBirth(
@@ -39,6 +46,7 @@ class BirthInputNormalizer(
             corrected = corrected,
             gender = input.gender,
             zasiMode = input.zasiMode,
+            instantKst = instantKst,
         )
     }
 
