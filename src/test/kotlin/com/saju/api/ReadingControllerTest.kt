@@ -92,6 +92,44 @@ class ReadingControllerTest(
     }
 
     @Test
+    fun `주제별 해석 - topic 파라미터`() {
+        given(generator.generate(anyString())).willReturn("올해 재물의 흐름은...")
+
+        mockMvc.post("/api/v1/saju/reading/2026?topic=money") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reading") { value(containsString("재물의 흐름")) }
+        }
+    }
+
+    @Test
+    fun `잘못된 topic - 400과 사용 가능 값 안내`() {
+        mockMvc.post("/api/v1/saju/reading/2026?topic=love") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.message") { value(containsString("love")) }
+            jsonPath("$.message") { value(containsString("general")) }
+        }
+    }
+
+    @Test
+    fun `결혼운 - marriage 경로가 year 변수에 삼켜지지 않음`() {
+        given(generator.generate(anyString())).willReturn("결혼 기운이 들어오는 시기는...")
+
+        mockMvc.post("/api/v1/saju/reading/marriage") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reading") { value(containsString("결혼 기운")) }
+        }
+    }
+
+    @Test
     fun `LLM 미구성 + 캐시 미스 - 503과 안내 메시지`() {
         given(generator.generate(anyString()))
             .willThrow(ReadingUnavailableException("LLM 해석이 구성되지 않았습니다: ANTHROPIC_API_KEY 환경변수를 설정하세요"))

@@ -1,5 +1,6 @@
 package com.saju.api
 
+import com.saju.reading.ReadingTopic
 import com.saju.reading.SajuReadingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 data class ReadingResponse(
@@ -53,6 +55,20 @@ class ReadingController(
         readingService.getDaeunReading(request.toBirthInput()).toResponse()
 
     @Operation(
+        summary = "결혼운 풀이",
+        description = "배우자성·배우자궁(일지) 상태와 향후 10년 세운 스캔을 근거로 " +
+            "결혼 기운이 들어오는 시기를 해석합니다. 스캔 기준 연도는 서버 현재 연도입니다.",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "해석 성공"),
+        ApiResponse(responseCode = "400", description = "잘못된 입력"),
+        ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
+    )
+    @PostMapping("/marriage")
+    fun marriage(@RequestBody request: BirthRequest): ReadingResponse =
+        readingService.getMarriageReading(request.toBirthInput()).toResponse()
+
+    @Operation(
         summary = "연도별 사주 해석문",
         description = "원국 분석과 해당 연도 운세를 근거로 한국어 해석문을 생성합니다. " +
             "동일 입력의 해석문은 DB에 영구 캐싱되어 재요청 시 LLM 호출 없이 반환됩니다 (cached=true).",
@@ -67,7 +83,17 @@ class ReadingController(
         @RequestBody request: BirthRequest,
         @Parameter(description = "해석 대상 연도", example = "2026")
         @PathVariable year: Int,
-    ): ReadingResponse = readingService.getReading(request.toBirthInput(), year).toResponse()
+        @Parameter(description = "해석 주제 (general: 종합, money: 금전운, career: 직장운, health: 건강운)", example = "general")
+        @RequestParam(defaultValue = "general") topic: String,
+    ): ReadingResponse {
+        val parsedTopic = runCatching { ReadingTopic.valueOf(topic.uppercase()) }
+            .getOrElse {
+                throw IllegalArgumentException(
+                    "지원하지 않는 topic입니다: $topic (사용 가능: general, money, career, health)"
+                )
+            }
+        return readingService.getReading(request.toBirthInput(), year, parsedTopic).toResponse()
+    }
 
     private fun SajuReadingService.ReadingResult.toResponse() =
         ReadingResponse(reading, model, cached, cacheKey)

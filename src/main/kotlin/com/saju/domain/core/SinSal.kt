@@ -14,6 +14,9 @@ enum class SinSal(val hangul: String, val hanja: String, val isGilsin: Boolean) 
     BAEKHO("백호대살", "白虎大殺", false),
     YANGIN_SAL("양인살", "羊刃殺", false),
     GONGMANG("공망", "空亡", false),
+    WONJIN("원진살", "怨嗔殺", false),   // 관계 갈등 — 일지 기준 판정
+    GOSIN("고신살", "孤辰殺", false),    // 고독수 (남명 중심) — 연지 기준
+    GWASUK("과숙살", "寡宿殺", false),   // 고독수 (여명 중심) — 연지 기준
 }
 
 enum class PillarPosition(val hangul: String) {

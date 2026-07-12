@@ -94,9 +94,91 @@ object ReadingPromptBuilder {
         )
     }
 
+    // ── 결혼운 (향후 10년 세운 스캔) ────────────────────────────────────
+
+    fun buildMarriage(data: WongukData, scanStartYear: Int): String = buildString {
+        val saju = data.saju
+        val dm = saju.dayMaster
+        val isMale = saju.birth.gender == com.saju.domain.core.Gender.MALE
+        val spouseStar = if (isMale) SipSeong.JEONGJAE else SipSeong.JEONGGWAN
+        val spouseGroup = if (isMale) com.saju.domain.core.SipSeongGroup.JAESEONG
+                          else com.saju.domain.core.SipSeongGroup.GWANSEONG
+        val dayJi = saju.dayPillar.ji
+
+        append(wongukBlock(data))
+        appendLine()
+        appendLine("[결혼운 데이터]")
+        appendLine("배우자성: ${spouseStar.hangul} (${if (isMale) "남명은 정재" else "여명은 정관"} 기준, 편성은 보조)")
+
+        // 원국 내 배우자성 위치
+        val positions = listOf("연간", "월간", "시간").zip(
+            listOf(saju.yearPillar.gan, saju.monthPillar.gan, saju.hourPillar.gan)
+        ) + listOf("연지", "월지", "일지", "시지").zip(
+            saju.pillars.map { it.ji.janggan.first() }
+        )
+        val spouseSpots = positions.filter { (_, gan) -> SipSeong.of(dm, gan).group == spouseGroup }
+            .map { (pos, gan) -> "$pos(${SipSeong.of(dm, gan).hangul})" }
+        appendLine("원국 배우자성: " + spouseSpots.joinToString(", ").ifEmpty { "없음 (세운으로 들어올 때가 중요)" })
+
+        appendLine("배우자궁(일지): ${dayJi.hanja}${dayJi.hangul} — 12운성 ${data.unSeong.day.hangul}")
+        val daySpotRelations = data.wongukRelations.filter {
+            com.saju.domain.core.PillarPosition.DAY in it.positions
+        }
+        appendLine(
+            "배우자궁 원국관계: " + daySpotRelations.joinToString(", ") {
+                "${it.type.hangul}(${it.positions.joinToString("·") { p -> p.hangul }})"
+            }.ifEmpty { "없음" }
+        )
+
+        appendLine()
+        appendLine("[향후 10년 세운 스캔] (${scanStartYear}~${scanStartYear + 9})")
+        for (year in scanStartYear until scanStartYear + 10) {
+            val seun = com.saju.domain.core.SixtyGapja.fromYear(year)
+            val ganSS = SipSeong.of(dm, seun.gan)
+            val jiSS = SipSeong.of(dm, seun.ji.janggan.first())
+            val marks = buildList {
+                if (ganSS == spouseStar || jiSS == spouseStar) add("배우자성")
+                else if (ganSS.group == spouseGroup || jiSS.group == spouseGroup) add("보조배우자성")
+                com.saju.domain.core.JiRelation.yukHapOf(seun.ji, dayJi)?.let { add("일지육합") }
+                com.saju.domain.core.JiRelation.banHapOf(seun.ji, dayJi)?.let { add("일지반합") }
+                if (com.saju.domain.core.JiRelation.isChung(seun.ji, dayJi)) add("일지충")
+                if (com.saju.domain.core.JiRelation.isHyeong(seun.ji, dayJi)) add("일지형")
+            }
+            appendLine(
+                "  ${year}년 ${seun.hanja} ${ganSS.hangul}/${jiSS.hangul}" +
+                    (if (marks.isEmpty()) "" else " ★" + marks.joinToString("·"))
+            )
+        }
+
+        appendLine()
+        append(
+            """
+            위 데이터를 근거로 결혼운 풀이를 작성하세요.
+
+            판단 기준: 배우자성이 세운에 드는 해와 배우자궁(일지)이 합으로 동(動)하는
+            해가 고전적 결혼 적기이며, 두 신호가 겹치는 해가 가장 강합니다.
+            일지충·형이 있는 해는 관계 변동에 주의가 필요한 해입니다.
+
+            출력 구조:
+            1. **배우자 인연의 구조** — 원국 배우자성 상태와 배우자궁이 말하는 인연의 모양
+            2. **결혼 기운이 들어오는 시기** — 스캔에서 신호(★)가 있는 연도를 근거와 함께
+               짚고, 신호가 겹치는 해를 강조. 신호 없는 해는 나열하지 않는다
+            3. **주의할 요소** — 원진·고신·과숙·일지충 등 장애 신살이 있다면 그 의미와
+               보완 관점 (없으면 이 섹션 생략)
+            4. **조언** — 시기에 매이지 않는 관계 조언과 한 줄 요약
+
+            분량: 한국어 1000~1400자. 반드시 완결된 문장으로 마무리할 것.
+            """.trimIndent()
+        )
+    }
+
     // ── 연도별 운세 ─────────────────────────────────────────────────────
 
-    fun buildYearly(data: WongukData, fortune: FortuneService.YearlyFortune): String = buildString {
+    fun buildYearly(
+        data: WongukData,
+        fortune: FortuneService.YearlyFortune,
+        topic: ReadingTopic = ReadingTopic.GENERAL,
+    ): String = buildString {
         append(wongukBlock(data))
         appendLine()
         appendLine("[운세 ${fortune.year}년, 나이 ${fortune.age}]")
@@ -130,21 +212,77 @@ object ReadingPromptBuilder {
         }
 
         appendLine()
-        append(
-            """
-            위 데이터를 근거로 ${fortune.year}년 운세 해석을 작성하세요.
+        append(yearlyInstruction(topic, fortune.year))
+    }
+
+    private fun yearlyInstruction(topic: ReadingTopic, year: Int): String = when (topic) {
+        ReadingTopic.GENERAL -> """
+            위 데이터를 근거로 ${year}년 운세 해석을 작성하세요.
 
             출력 구조:
             1. **원국 개관** — 일간·격국·용신이 말하는 기질 구조 (간략히)
             2. **현재 대운** — 대운 간지의 십성 의미와 원국 관계가 만드는 10년 흐름
-            3. **${fortune.year}년 운세** — 세운의 십성 주제, 원국·대운과의 합충형파해가
+            3. **${year}년 운세** — 세운의 십성 주제, 원국·대운과의 합충형파해가
                만드는 사건 방향. 삼재 여부 언급
             4. **월별 흐름** — 길한 달과 조심할 달을 근거와 함께 묶어 서술 (의미 있는 것만)
             5. **한 줄 요약** — 이 해를 관통하는 조언 한 문장
 
-            분량: 한국어 800~1200자.
-            """.trimIndent()
-        )
+            분량: 한국어 800~1200자. 반드시 완결된 문장으로 마무리할 것.
+        """.trimIndent()
+
+        ReadingTopic.MONEY -> """
+            위 데이터를 근거로 ${year}년 금전운 해석을 작성하세요.
+            재성(편재·정재)과 관련된 데이터를 중심으로 읽어냅니다.
+
+            출력 구조:
+            1. **타고난 재물 그릇** — 원국의 재성 상태와 신강/신약이 말하는 재물 체질
+               (신약한데 재성이 강하면 "감당" 이슈, 재성이 용신이면 순풍 구조 등)
+            2. **${year}년 재물 흐름** — 세운·대운에서 재성이 어떻게 움직이는지,
+               합충이 만드는 수입·지출·투자 방향
+            3. **월별 재물 포인트** — 재성이 들어오거나 충이 걸리는 달만 골라 서술
+            4. **조언과 요약** — 이 해의 돈 관리 원칙 한 문장
+
+            분량: 한국어 800~1200자. 반드시 완결된 문장으로 마무리할 것.
+        """.trimIndent()
+
+        ReadingTopic.CAREER -> """
+            위 데이터를 근거로 ${year}년 직장운(커리어) 해석을 작성하세요.
+            관성(직장·직책)과 식상(이직·독립·표현), 역마살, 충(변동 신호)을 중심으로
+            읽어냅니다.
+
+            출력 구조:
+            1. **타고난 직업 구조** — 원국의 관성·식상 배치와 격국이 말하는 커리어 성향
+               (조직형인지 독립형인지)
+            2. **${year}년 직장 흐름** — 세운의 관성/식상 기운, 원국·대운과의 관계가
+               만드는 승진·이동·이직 신호
+            3. **이직·변동 판단** — 충·역마 등 변동 신호가 있는지, 있다면 움직이기
+               좋은 시기인지 버틸 시기인지
+            4. **월별 포인트** — 커리어 관련 의미 있는 달만 골라 서술
+            5. **조언과 요약** — 이 해의 커리어 전략 한 문장
+
+            분량: 한국어 800~1200자. 반드시 완결된 문장으로 마무리할 것.
+        """.trimIndent()
+
+        ReadingTopic.HEALTH -> """
+            위 데이터를 근거로 ${year}년 건강운 해석을 작성하세요.
+
+            오행-장부 대응(전통 명리 관점): 木=간·담·눈·근육, 火=심장·혈관·소장,
+            土=비장·위·소화기, 金=폐·대장·호흡기·피부, 水=신장·방광·생식기·뼈.
+
+            출력 구조:
+            1. **타고난 체질 경향** — 원국의 과다/결핍 오행이 가리키는 취약 부위와
+               강한 부위 (위 대응표 근거)
+            2. **${year}년 건강 흐름** — 세운이 강화하는 오행이 기신인지 희신인지,
+               충·형이 걸리는 부위 관점
+            3. **조심할 달** — 충·형이 집중되거나 기신 오행이 강해지는 달
+            4. **관리 조언** — 생활 습관 관점의 실용 조언과 한 줄 요약
+
+            반드시 지킬 것: 이 해석은 전통 명리 관점의 참고 정보이며 의학적 진단이나
+            치료 조언이 아님을 마지막에 한 문장으로 명시한다. 특정 질병을 단정하지
+            않는다.
+
+            분량: 한국어 800~1200자. 반드시 완결된 문장으로 마무리할 것.
+        """.trimIndent()
     }
 
     // ── 공통 원국 블록 ──────────────────────────────────────────────────

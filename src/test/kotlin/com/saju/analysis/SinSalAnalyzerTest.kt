@@ -168,6 +168,63 @@ class SinSalAnalyzerTest {
         assertEquals(emptyList(), hits(saju, SinSal.GONGMANG))
     }
 
+    // ── 원진살 ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `원진살 - 일지 기준 원진 쌍 검출`() {
+        // 일지 丑, 월지 午 → 丑午 원진
+        val saju = syntheticSaju("庚辰", "甲午", "辛丑", "戊子")
+        val found = hits(saju, SinSal.WONJIN)
+        assertEquals(listOf(PillarPosition.MONTH), found.map { it.position })
+    }
+
+    @Test
+    fun `원진살 - 6쌍 전체 검증 (일지 기준)`() {
+        // 각 원진 쌍을 일지-시지에 배치해 검출 확인
+        val pairs = listOf(
+            "甲子" to "乙未", "辛丑" to "甲午", "丙寅" to "辛酉",
+            "丁卯" to "甲申", "戊辰" to "辛亥", "乙巳" to "甲戌",
+        )
+        pairs.forEach { (day, hour) ->
+            val saju = syntheticSaju("庚子", "戊寅", day, hour)
+            assertTrue(
+                hits(saju, SinSal.WONJIN).any { it.position == PillarPosition.HOUR },
+                "$day 일주 - $hour 시주 원진 미검출",
+            )
+        }
+    }
+
+    // ── 고신·과숙살 ─────────────────────────────────────────────────────
+
+    @ParameterizedTest(name = "연지 {0}생: 고신={1}, 과숙={2}")
+    @CsvSource(
+        "子, 寅, 戌",  // 해자축생
+        "卯, 巳, 丑",  // 인묘진생
+        "午, 申, 辰",  // 사오미생
+        "酉, 亥, 未",  // 신유술생
+    )
+    fun `고신 과숙 조견표 - 4개 방합군 검증`(yearJi: String, gosinJi: String, gwasukJi: String) {
+        val yearPillar = when (yearJi) {
+            "子" -> "甲子"; "卯" -> "丁卯"; "午" -> "甲午"; else -> "丁酉"
+        }
+        val gosinPillar = when (gosinJi) {
+            "寅" -> "丙寅"; "巳" -> "乙巳"; "申" -> "甲申"; else -> "丁亥"
+        }
+        val gwasukPillar = when (gwasukJi) {
+            "戌" -> "甲戌"; "丑" -> "丁丑"; "辰" -> "戊辰"; else -> "乙未"
+        }
+
+        val saju = syntheticSaju(yearPillar, gosinPillar, gwasukPillar, "戊子")
+        assertTrue(
+            hits(saju, SinSal.GOSIN).any { it.position == PillarPosition.MONTH },
+            "$yearJi 생 고신($gosinJi) 미검출",
+        )
+        assertTrue(
+            hits(saju, SinSal.GWASUK).any { it.position == PillarPosition.DAY },
+            "$yearJi 생 과숙($gwasukJi) 미검출",
+        )
+    }
+
     // ── 실제 사주 통합 ──────────────────────────────────────────────────
 
     @Test

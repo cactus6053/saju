@@ -55,12 +55,23 @@ class SajuReadingService(
         return cachedGenerate(prompt)
     }
 
-    // 연도별 운세 해석
-    fun getReading(input: BirthInput, year: Int): ReadingResult {
+    // 연도별 운세 해석 (종합 또는 주제별: 금전·직장·건강)
+    fun getReading(input: BirthInput, year: Int, topic: ReadingTopic = ReadingTopic.GENERAL): ReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildYearly(
             data = wongukData(saju),
             fortune = fortuneService.fortuneOfYear(saju, year),
+            topic = topic,
+        )
+        return cachedGenerate(prompt)
+    }
+
+    // 결혼운 — 서버 현재 연도부터 10년 세운 스캔 (해가 바뀌면 캐시 자연 갱신)
+    fun getMarriageReading(input: BirthInput): ReadingResult {
+        val saju = sajuCalculator.calculate(input)
+        val prompt = ReadingPromptBuilder.buildMarriage(
+            data = wongukData(saju),
+            scanStartYear = java.time.Year.now().value,
         )
         return cachedGenerate(prompt)
     }

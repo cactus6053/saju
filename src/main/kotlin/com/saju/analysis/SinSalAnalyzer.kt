@@ -75,6 +75,28 @@ class SinSalAnalyzer {
         private val YANGIN: Map<CheonGan, JiJi> = mapOf(
             GAP to MYO, BYEONG to O, MU to O, GYEONG to YU, IM to JA,
         )
+
+        // 원진살: 6쌍 — 일지(배우자궁) 기준으로 판정
+        private val WONJIN_PAIRS: List<Set<JiJi>> = listOf(
+            setOf(JA, MI), setOf(CHUK, O), setOf(IN, YU),
+            setOf(MYO, SHIN), setOf(JIN, HAE), setOf(SA, SUL),
+        )
+
+        // 고신·과숙살: 연지의 방합(계절) 그룹 기준
+        // 다음 계절의 생지 = 고신, 이전 계절의 고지 = 과숙
+        private val GOSIN: Map<JiJi, JiJi> = buildMap {
+            listOf(HAE, JA, CHUK).forEach { put(it, IN) }   // 해자축생 → 고신 寅
+            listOf(IN, MYO, JIN).forEach { put(it, SA) }    // 인묘진생 → 고신 巳
+            listOf(SA, O, MI).forEach { put(it, SHIN) }     // 사오미생 → 고신 申
+            listOf(SHIN, YU, SUL).forEach { put(it, HAE) }  // 신유술생 → 고신 亥
+        }
+
+        private val GWASUK: Map<JiJi, JiJi> = buildMap {
+            listOf(HAE, JA, CHUK).forEach { put(it, SUL) }  // 해자축생 → 과숙 戌
+            listOf(IN, MYO, JIN).forEach { put(it, CHUK) }  // 인묘진생 → 과숙 丑
+            listOf(SA, O, MI).forEach { put(it, JIN) }      // 사오미생 → 과숙 辰
+            listOf(SHIN, YU, SUL).forEach { put(it, MI) }   // 신유술생 → 과숙 未
+        }
     }
 
     fun analyze(saju: SajuResult): List<SinSalHit> {
@@ -125,6 +147,23 @@ class SinSalAnalyzer {
         pillars.forEachIndexed { i, p ->
             if (positions[i] == PillarPosition.DAY) return@forEachIndexed
             if (p.ji in gongmang) hits += SinSalHit(SinSal.GONGMANG, positions[i])
+        }
+
+        // 원진살: 일지(배우자궁) 기준 — 다른 지지와 원진 쌍이면 상대 위치에 표시
+        val dayJi = saju.dayPillar.ji
+        pillars.forEachIndexed { i, p ->
+            if (positions[i] == PillarPosition.DAY) return@forEachIndexed
+            if (WONJIN_PAIRS.any { it == setOf(dayJi, p.ji) }) {
+                hits += SinSalHit(SinSal.WONJIN, positions[i])
+            }
+        }
+
+        // 고신·과숙살: 연지 기준 — 다른 지지에서 해당 지지 검색
+        val yearJi = saju.yearPillar.ji
+        pillars.forEachIndexed { i, p ->
+            if (positions[i] == PillarPosition.YEAR) return@forEachIndexed
+            if (p.ji == GOSIN.getValue(yearJi)) hits += SinSalHit(SinSal.GOSIN, positions[i])
+            if (p.ji == GWASUK.getValue(yearJi)) hits += SinSalHit(SinSal.GWASUK, positions[i])
         }
 
         return hits.distinct()

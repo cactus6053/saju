@@ -157,6 +157,54 @@ class SajuReadingServiceTest(
     }
 
     @Test
+    fun `주제별 해석은 서로 다른 캐시 키 - 종합·금전·직장·건강`() {
+        given(generator.generate(anyString())).willReturn("해석문")
+
+        val keys = ReadingTopic.entries.map { topic ->
+            service.getReading(input, 2026, topic).cacheKey
+        }
+        assertEquals(ReadingTopic.entries.size, keys.distinct().size)
+    }
+
+    @Test
+    fun `주제별 해석도 캐싱 동작`() {
+        given(generator.generate(anyString())).willReturn("금전운 해석")
+
+        val first = service.getReading(input, 2026, ReadingTopic.MONEY)
+        val second = service.getReading(input, 2026, ReadingTopic.MONEY)
+
+        assertFalse(first.cached)
+        assertTrue(second.cached)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
+    fun `결혼운 - 캐싱 동작 및 다른 해석과 키 분리`() {
+        given(generator.generate(anyString())).willReturn("결혼운 해석")
+
+        val first = service.getMarriageReading(input)
+        val second = service.getMarriageReading(input)
+
+        assertFalse(first.cached)
+        assertTrue(second.cached)
+        verify(generator, times(1)).generate(anyString())
+
+        given(generator.generate(anyString())).willReturn("종합 해석")
+        val yearly = service.getReading(input, 2026)
+        assertNotEquals(first.cacheKey, yearly.cacheKey)
+    }
+
+    @Test
+    fun `결혼운 - 성별에 따라 배우자성이 달라 키 분리`() {
+        given(generator.generate(anyString())).willReturn("해석문")
+
+        val female = service.getMarriageReading(input)
+        val male = service.getMarriageReading(input.copy(gender = Gender.MALE))
+
+        assertNotEquals(female.cacheKey, male.cacheKey)
+    }
+
+    @Test
     fun `프롬프트는 결정적 - 같은 입력이면 항상 같은 캐시 키`() {
         given(generator.generate(anyString())).willReturn("해석문")
 
