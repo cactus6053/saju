@@ -8,10 +8,11 @@ class JeolgiCalculator {
 
     private val DEGREES_PER_DAY = 360.0 / 365.25
 
-    // 주어진 연도의 절기 발생 시각을 KST로 반환
+    // 주어진 연도의 절기 발생 시각을 KST로 반환 (ΔT 보정 적용)
     fun getMoment(year: Int, jeolgi: Jeolgi): LocalDateTime {
-        val jde = findJde(year, jeolgi.solarLongitude)
-        return SolarLongitude.toUtc(jde).plusHours(9)  // KST = UTC+9
+        val jde = findJde(year, jeolgi.solarLongitude)      // TT 기준
+        val jdUt = DeltaT.ttToUt(jde, year)                 // UT 기준으로 보정
+        return SolarLongitude.toUtc(jdUt).plusHours(9)      // KST = UTC+9
     }
 
     // 해당 연도 24절기 전체 반환
