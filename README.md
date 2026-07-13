@@ -190,6 +190,11 @@ curl -X POST localhost:9600/api/v1/saju/daeun \
 (`ko`(기본)·`en`·`es`·`zh`·`ja`·`th`·`vi`·`ms` — FE 지원 언어와 동일).
 언어별로 캐시가 분리되며, 요청된 언어만 생성됩니다.
 
+긴 해석 4종(원국·대운·결혼운·주제별)의 응답은 해석 종류별 **고정 섹션**으로
+정형화되어 있습니다 — LLM이 항상 같은 키의 JSON을 생성하고(키 누락 시 1회
+재시도, 검증 통과분만 캐시), API는 `sections: [{key, title, body}]`로
+반환합니다. FE는 key 기반으로 항상 같은 카드 레이아웃을 렌더링하면 됩니다.
+
 ```bash
 curl -X POST localhost:9600/api/v1/saju/reading/2026 \
   -H 'Content-Type: application/json' \

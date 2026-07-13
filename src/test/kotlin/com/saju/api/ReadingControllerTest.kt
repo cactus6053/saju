@@ -33,6 +33,16 @@ class ReadingControllerTest(
         }
     """.trimIndent()
 
+    // 모든 해석 종류의 섹션 키를 포함하는 범용 LLM 목 응답 — 어떤 스펙 검증도 통과
+    private val sectionsJson = run {
+        val keys = (com.saju.reading.ReadingSections.WONGUK +
+            com.saju.reading.ReadingSections.DAEUN +
+            com.saju.reading.ReadingSections.MARRIAGE +
+            com.saju.reading.ReadingTopic.entries.flatMap { com.saju.reading.ReadingSections.yearly(it) })
+            .map { it.key }.toSet()
+        "{" + keys.joinToString(",") { "\"$it\":\"$it 내용\"" } + "}"
+    }
+
     @BeforeEach
     fun setUp() {
         repository.deleteAll()
@@ -40,15 +50,18 @@ class ReadingControllerTest(
     }
 
     @Test
-    fun `해석 생성 - 첫 요청은 cached false, 재요청은 true`() {
-        given(generator.generate(anyString())).willReturn("2026년은 재성의 해입니다...")
+    fun `해석 생성 - 섹션 구조 반환, 첫 요청은 cached false, 재요청은 true`() {
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         mockMvc.post("/api/v1/saju/reading/2026") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("재성의 해")) }
+            jsonPath("$.sections.length()") { value(5) }
+            jsonPath("$.sections[0].key") { value("overview") }
+            jsonPath("$.sections[0].title") { value("원국 개관") }
+            jsonPath("$.sections[0].body") { value(containsString("overview 내용")) }
             jsonPath("$.model") { value("claude-haiku-4-5") }
             jsonPath("$.cached") { value(false) }
         }
@@ -64,21 +77,21 @@ class ReadingControllerTest(
 
     @Test
     fun `원국 풀이 - POST reading (연도 없음)`() {
-        given(generator.generate(anyString())).willReturn("일간 계수의 평생사주는...")
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         mockMvc.post("/api/v1/saju/reading") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("평생사주")) }
+            jsonPath("$.sections[0].key") { value("dayMaster") }
             jsonPath("$.cached") { value(false) }
         }
     }
 
     @Test
     fun `대운 풀이 - daeun 경로가 year 변수에 삼켜지지 않음`() {
-        given(generator.generate(anyString())).willReturn("대운의 흐름은...")
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         // /reading/daeun이 /reading/{year}로 매칭되면 Int 변환 실패로 400이 남 —
         // 200이면 라우팅이 정확함
@@ -87,46 +100,47 @@ class ReadingControllerTest(
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("대운의 흐름")) }
+            jsonPath("$.sections[0].key") { value("direction") }
         }
     }
 
     @Test
     fun `주제별 해석 - topic 파라미터`() {
-        given(generator.generate(anyString())).willReturn("올해 재물의 흐름은...")
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         mockMvc.post("/api/v1/saju/reading/2026?topic=money") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("재물의 흐름")) }
+            jsonPath("$.sections[0].key") { value("capacity") }
+            jsonPath("$.sections[0].title") { value("타고난 재물 그릇") }
         }
     }
 
     @Test
     fun `애정운 해석 - topic=love`() {
-        given(generator.generate(anyString())).willReturn("올해 연애의 기류는...")
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         mockMvc.post("/api/v1/saju/reading/2026?topic=love") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("연애의 기류")) }
+            jsonPath("$.sections[0].key") { value("style") }
         }
     }
 
     @Test
     fun `lang 파라미터 - 지원 언어는 200`() {
-        given(generator.generate(anyString())).willReturn("English reading...")
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         mockMvc.post("/api/v1/saju/reading?lang=en") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("English")) }
+            jsonPath("$.sections.length()") { value(5) }
         }
     }
 
@@ -156,14 +170,15 @@ class ReadingControllerTest(
 
     @Test
     fun `결혼운 - marriage 경로가 year 변수에 삼켜지지 않음`() {
-        given(generator.generate(anyString())).willReturn("결혼 기운이 들어오는 시기는...")
+        given(generator.generate(anyString())).willReturn(sectionsJson)
 
         mockMvc.post("/api/v1/saju/reading/marriage") {
             contentType = MediaType.APPLICATION_JSON
             content = body
         }.andExpect {
             status { isOk() }
-            jsonPath("$.reading") { value(containsString("결혼 기운")) }
+            jsonPath("$.sections[0].key") { value("structure") }
+            jsonPath("$.sections[1].key") { value("timing") }
         }
     }
 

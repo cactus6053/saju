@@ -46,22 +46,31 @@ class SajuReadingService(
         val cacheKey: String,
     )
 
+    data class ReadingSection(val key: String, val title: String, val body: String)
+
+    data class StructuredReadingResult(
+        val sections: List<ReadingSection>,
+        val model: String,
+        val cached: Boolean,
+        val cacheKey: String,
+    )
+
     // 원국 풀이 (평생사주) — 연도 무관, 캐시 적중률 최고
-    fun getWongukReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): ReadingResult {
+    fun getWongukReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): StructuredReadingResult {
         val saju = sajuCalculator.calculate(input)
-        val prompt = withLanguage(ReadingPromptBuilder.buildWonguk(wongukData(saju)), lang)
-        return cachedGenerate(prompt, ReadingKind.WONGUK)
+        val prompt = ReadingPromptBuilder.buildWonguk(wongukData(saju))
+        return structuredGenerate(prompt, ReadingKind.WONGUK, ReadingSections.WONGUK, lang)
     }
 
     // 대운 풀이 (10년 단위 인생 흐름)
-    fun getDaeunReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): ReadingResult {
+    fun getDaeunReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): StructuredReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildDaeun(
             data = wongukData(saju),
             direction = daeunStartCalculator.directionOf(saju),
             timeline = fortuneService.daeunTimeline(saju),
         )
-        return cachedGenerate(withLanguage(prompt, lang), ReadingKind.DAEUN)
+        return structuredGenerate(prompt, ReadingKind.DAEUN, ReadingSections.DAEUN, lang)
     }
 
     // 연도별 운세 해석 (종합 또는 주제별: 금전·직장·건강·애정)
@@ -70,24 +79,50 @@ class SajuReadingService(
         year: Int,
         topic: ReadingTopic = ReadingTopic.GENERAL,
         lang: ReadingLanguage = ReadingLanguage.KO,
-    ): ReadingResult {
+    ): StructuredReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildYearly(
             data = wongukData(saju),
             fortune = fortuneService.fortuneOfYear(saju, year),
             topic = topic,
         )
-        return cachedGenerate(withLanguage(prompt, lang), ReadingKind.YEARLY)
+        return structuredGenerate(prompt, ReadingKind.YEARLY, ReadingSections.yearly(topic), lang)
     }
 
     // 결혼운 — 서버 현재 연도부터 10년 세운 스캔 (해가 바뀌면 캐시 자연 갱신)
-    fun getMarriageReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): ReadingResult {
+    fun getMarriageReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): StructuredReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildMarriage(
             data = wongukData(saju),
             scanStartYear = java.time.Year.now().value,
         )
-        return cachedGenerate(withLanguage(prompt, lang), ReadingKind.MARRIAGE)
+        return structuredGenerate(prompt, ReadingKind.MARRIAGE, ReadingSections.MARRIAGE, lang)
+    }
+
+    // 고정 섹션 JSON 해석 — 검증 통과분만 캐시, 스펙 순서대로 섹션 반환
+    private fun structuredGenerate(
+        prompt: String,
+        kind: ReadingKind,
+        specs: List<SectionSpec>,
+        lang: ReadingLanguage,
+    ): StructuredReadingResult {
+        val result = cachedGenerate(withLanguage(prompt, lang), kind, validate = { parseSections(it, specs) })
+        val bodies = parseSections(result.reading, specs)
+        return StructuredReadingResult(
+            sections = specs.map { ReadingSection(it.key, it.title, bodies.getValue(it.key)) },
+            model = result.model,
+            cached = result.cached,
+            cacheKey = result.cacheKey,
+        )
+    }
+
+    private fun parseSections(content: String, specs: List<SectionSpec>): Map<String, String> {
+        val root = readJson(content, "해석")
+        return specs.associate { spec ->
+            spec.key to root.path(spec.key).asText("").trim().ifEmpty {
+                throw ReadingGenerationException("해석에 ${spec.key} 섹션이 없습니다")
+            }
+        }
     }
 
     data class DailyReadingResult(
@@ -177,13 +212,16 @@ class SajuReadingService(
             - 분량 지시의 글자 수는 해당 언어에서 비슷한 정보량이 되도록 자연스럽게 환산.
         """.trimIndent()
 
-    // LLM JSON 파싱 + 완전성 검증 — 실패 시 예외 (검증 통과 전에는 캐시에 저장되지 않는다)
-    private fun parseSummaryJson(content: String): Pair<Map<FortuneCategory, String>, Map<Int, String>> {
+    // 코드펜스 방어 후 JSON 트리 파싱 — 실패 시 예외 (검증 통과 전에는 캐시에 저장되지 않는다)
+    private fun readJson(content: String, label: String): com.fasterxml.jackson.databind.JsonNode {
         val json = content.trim()
             .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        return runCatching { objectMapper.readTree(json) }
+            .getOrElse { throw ReadingGenerationException("$label JSON 파싱 실패: ${it.message}") }
+    }
 
-        val root = runCatching { objectMapper.readTree(json) }
-            .getOrElse { throw ReadingGenerationException("연간 요약 JSON 파싱 실패: ${it.message}") }
+    private fun parseSummaryJson(content: String): Pair<Map<FortuneCategory, String>, Map<Int, String>> {
+        val root = readJson(content, "연간 요약")
 
         val categories = FortuneCategory.entries.associateWith { category ->
             root.path("categories").path(category.name).asText("").trim().ifEmpty {

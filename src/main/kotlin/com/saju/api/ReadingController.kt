@@ -15,8 +15,14 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
+data class ReadingSectionDto(
+    val key: String,
+    val title: String,
+    val body: String,
+)
+
 data class ReadingResponse(
-    val reading: String,
+    val sections: List<ReadingSectionDto>,
     val model: String,
     val cached: Boolean,
     val cacheKey: String,
@@ -111,8 +117,12 @@ class ReadingController(
             .toResponse()
     }
 
-    private fun SajuReadingService.ReadingResult.toResponse() =
-        ReadingResponse(reading, model, cached, cacheKey)
+    private fun SajuReadingService.StructuredReadingResult.toResponse() = ReadingResponse(
+        sections = sections.map { ReadingSectionDto(it.key, it.title, it.body) },
+        model = model,
+        cached = cached,
+        cacheKey = cacheKey,
+    )
 
     companion object {
         const val LANG_DESC = "출력 언어 (ko, en, es, zh, ja, th, vi, ms)"
