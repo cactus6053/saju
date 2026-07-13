@@ -1,5 +1,6 @@
 package com.saju.api
 
+import com.saju.reading.ReadingLanguage
 import com.saju.reading.ReadingTopic
 import com.saju.reading.SajuReadingService
 import io.swagger.v3.oas.annotations.Operation
@@ -38,8 +39,12 @@ class ReadingController(
         ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
     )
     @PostMapping
-    fun wonguk(@RequestBody request: BirthRequest): ReadingResponse =
-        readingService.getWongukReading(request.toBirthInput()).toResponse()
+    fun wonguk(
+        @RequestBody request: BirthRequest,
+        @Parameter(description = LANG_DESC, example = "ko")
+        @RequestParam(defaultValue = "ko") lang: String,
+    ): ReadingResponse =
+        readingService.getWongukReading(request.toBirthInput(), ReadingLanguage.of(lang)).toResponse()
 
     @Operation(
         summary = "대운 풀이 (10년 단위 인생 흐름)",
@@ -51,8 +56,12 @@ class ReadingController(
         ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
     )
     @PostMapping("/daeun")
-    fun daeun(@RequestBody request: BirthRequest): ReadingResponse =
-        readingService.getDaeunReading(request.toBirthInput()).toResponse()
+    fun daeun(
+        @RequestBody request: BirthRequest,
+        @Parameter(description = LANG_DESC, example = "ko")
+        @RequestParam(defaultValue = "ko") lang: String,
+    ): ReadingResponse =
+        readingService.getDaeunReading(request.toBirthInput(), ReadingLanguage.of(lang)).toResponse()
 
     @Operation(
         summary = "결혼운 풀이",
@@ -65,8 +74,12 @@ class ReadingController(
         ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
     )
     @PostMapping("/marriage")
-    fun marriage(@RequestBody request: BirthRequest): ReadingResponse =
-        readingService.getMarriageReading(request.toBirthInput()).toResponse()
+    fun marriage(
+        @RequestBody request: BirthRequest,
+        @Parameter(description = LANG_DESC, example = "ko")
+        @RequestParam(defaultValue = "ko") lang: String,
+    ): ReadingResponse =
+        readingService.getMarriageReading(request.toBirthInput(), ReadingLanguage.of(lang)).toResponse()
 
     @Operation(
         summary = "연도별 사주 해석문",
@@ -85,6 +98,8 @@ class ReadingController(
         @PathVariable year: Int,
         @Parameter(description = "해석 주제 (general: 종합, money: 금전운, career: 직장운, health: 건강운, love: 애정운)", example = "general")
         @RequestParam(defaultValue = "general") topic: String,
+        @Parameter(description = LANG_DESC, example = "ko")
+        @RequestParam(defaultValue = "ko") lang: String,
     ): ReadingResponse {
         val parsedTopic = runCatching { ReadingTopic.valueOf(topic.uppercase()) }
             .getOrElse {
@@ -92,9 +107,14 @@ class ReadingController(
                     "지원하지 않는 topic입니다: $topic (사용 가능: general, money, career, health, love)"
                 )
             }
-        return readingService.getReading(request.toBirthInput(), year, parsedTopic).toResponse()
+        return readingService.getReading(request.toBirthInput(), year, parsedTopic, ReadingLanguage.of(lang))
+            .toResponse()
     }
 
     private fun SajuReadingService.ReadingResult.toResponse() =
         ReadingResponse(reading, model, cached, cacheKey)
+
+    companion object {
+        const val LANG_DESC = "출력 언어 (ko, en, es, zh, ja, th, vi, ms)"
+    }
 }

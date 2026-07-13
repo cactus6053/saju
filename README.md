@@ -186,6 +186,10 @@ curl -X POST localhost:9600/api/v1/saju/daeun \
 
 요청 본문은 계산 API와 동일한 `BirthRequest`입니다.
 
+모든 해석 API는 `?lang=` 파라미터로 출력 언어를 지정할 수 있습니다
+(`ko`(기본)·`en`·`es`·`zh`·`ja`·`th`·`vi`·`ms` — FE 지원 언어와 동일).
+언어별로 캐시가 분리되며, 요청된 언어만 생성됩니다.
+
 ```bash
 curl -X POST localhost:9600/api/v1/saju/reading/2026 \
   -H 'Content-Type: application/json' \

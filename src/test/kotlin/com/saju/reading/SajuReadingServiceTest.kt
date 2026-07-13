@@ -312,6 +312,42 @@ class SajuReadingServiceTest(
         assertEquals(0, repository.count())
     }
 
+    // ── 다국어 ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `lang별로 캐시 키가 분리된다`() {
+        given(generator.generate(anyString())).willReturn("해석문")
+
+        val ko = service.getWongukReading(input, ReadingLanguage.KO)
+        val en = service.getWongukReading(input, ReadingLanguage.EN)
+        val ja = service.getWongukReading(input, ReadingLanguage.JA)
+
+        assertEquals(3, setOf(ko.cacheKey, en.cacheKey, ja.cacheKey).size)
+        verify(generator, times(3)).generate(anyString())
+    }
+
+    @Test
+    fun `lang 기본값 ko는 명시적 ko와 같은 캐시 키 - 기존 캐시 호환`() {
+        given(generator.generate(anyString())).willReturn("해석문")
+
+        val default = service.getWongukReading(input)
+        val explicitKo = service.getWongukReading(input, ReadingLanguage.KO)
+
+        assertEquals(default.cacheKey, explicitKo.cacheKey)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
+    fun `연간 요약도 lang별 캐시 분리, 검증은 언어 무관 동작`() {
+        given(generator.generate(anyString())).willReturn(validSummaryJson())
+
+        val ko = service.getYearlySummary(input, 2026)
+        val en = service.getYearlySummary(input, 2026, ReadingLanguage.EN)
+
+        assertNotEquals(ko.cacheKey, en.cacheKey)
+        assertEquals(12, en.months.size)
+    }
+
     @Test
     fun `저장 시 kind가 종류별로 기록된다`() {
         given(generator.generate(anyString())).willReturn("한 줄\n\n메시지")

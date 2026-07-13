@@ -7,6 +7,7 @@ import com.saju.analysis.RelationAnalyzer
 import com.saju.analysis.SinSalAnalyzer
 import com.saju.analysis.SipSeongAnalyzer
 import com.saju.engine.SajuCalculator
+import com.saju.reading.ReadingLanguage
 import com.saju.reading.SajuReadingService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -98,8 +99,10 @@ class SajuController(
         @RequestBody request: BirthRequest,
         @Parameter(description = "조회 연도", example = "2026")
         @PathVariable year: Int,
+        @Parameter(description = ReadingController.LANG_DESC, example = "ko")
+        @RequestParam(defaultValue = "ko") lang: String,
     ): YearlySummaryResponse =
-        readingService.getYearlySummary(request.toBirthInput(), year).toDto()
+        readingService.getYearlySummary(request.toBirthInput(), year, ReadingLanguage.of(lang)).toDto()
 
     @Operation(
         summary = "일일 운세",
@@ -116,8 +119,10 @@ class SajuController(
         @RequestBody request: BirthRequest,
         @Parameter(description = "조회 날짜 (생략 시 서버 오늘, 최대 내일)", example = "2026-07-13")
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) date: LocalDate?,
+        @Parameter(description = ReadingController.LANG_DESC, example = "ko")
+        @RequestParam(defaultValue = "ko") lang: String,
     ): DailyFortuneResponse =
-        readingService.getDailyReading(request.toBirthInput(), date).toDto()
+        readingService.getDailyReading(request.toBirthInput(), date, ReadingLanguage.of(lang)).toDto()
 
     @Operation(
         summary = "대운 타임라인",

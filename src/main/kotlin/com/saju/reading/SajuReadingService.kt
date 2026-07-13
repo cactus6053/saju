@@ -47,41 +47,47 @@ class SajuReadingService(
     )
 
     // 원국 풀이 (평생사주) — 연도 무관, 캐시 적중률 최고
-    fun getWongukReading(input: BirthInput): ReadingResult {
+    fun getWongukReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): ReadingResult {
         val saju = sajuCalculator.calculate(input)
-        return cachedGenerate(ReadingPromptBuilder.buildWonguk(wongukData(saju)), ReadingKind.WONGUK)
+        val prompt = withLanguage(ReadingPromptBuilder.buildWonguk(wongukData(saju)), lang)
+        return cachedGenerate(prompt, ReadingKind.WONGUK)
     }
 
     // 대운 풀이 (10년 단위 인생 흐름)
-    fun getDaeunReading(input: BirthInput): ReadingResult {
+    fun getDaeunReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): ReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildDaeun(
             data = wongukData(saju),
             direction = daeunStartCalculator.directionOf(saju),
             timeline = fortuneService.daeunTimeline(saju),
         )
-        return cachedGenerate(prompt, ReadingKind.DAEUN)
+        return cachedGenerate(withLanguage(prompt, lang), ReadingKind.DAEUN)
     }
 
-    // 연도별 운세 해석 (종합 또는 주제별: 금전·직장·건강)
-    fun getReading(input: BirthInput, year: Int, topic: ReadingTopic = ReadingTopic.GENERAL): ReadingResult {
+    // 연도별 운세 해석 (종합 또는 주제별: 금전·직장·건강·애정)
+    fun getReading(
+        input: BirthInput,
+        year: Int,
+        topic: ReadingTopic = ReadingTopic.GENERAL,
+        lang: ReadingLanguage = ReadingLanguage.KO,
+    ): ReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildYearly(
             data = wongukData(saju),
             fortune = fortuneService.fortuneOfYear(saju, year),
             topic = topic,
         )
-        return cachedGenerate(prompt, ReadingKind.YEARLY)
+        return cachedGenerate(withLanguage(prompt, lang), ReadingKind.YEARLY)
     }
 
     // 결혼운 — 서버 현재 연도부터 10년 세운 스캔 (해가 바뀌면 캐시 자연 갱신)
-    fun getMarriageReading(input: BirthInput): ReadingResult {
+    fun getMarriageReading(input: BirthInput, lang: ReadingLanguage = ReadingLanguage.KO): ReadingResult {
         val saju = sajuCalculator.calculate(input)
         val prompt = ReadingPromptBuilder.buildMarriage(
             data = wongukData(saju),
             scanStartYear = java.time.Year.now().value,
         )
-        return cachedGenerate(prompt, ReadingKind.MARRIAGE)
+        return cachedGenerate(withLanguage(prompt, lang), ReadingKind.MARRIAGE)
     }
 
     data class DailyReadingResult(
@@ -93,7 +99,11 @@ class SajuReadingService(
     )
 
     // 일일 운세 — 점수·행운 요소는 엔진, 한 줄/메시지만 LLM. 미래는 내일까지만 허용
-    fun getDailyReading(input: BirthInput, date: java.time.LocalDate?): DailyReadingResult {
+    fun getDailyReading(
+        input: BirthInput,
+        date: java.time.LocalDate?,
+        lang: ReadingLanguage = ReadingLanguage.KO,
+    ): DailyReadingResult {
         val target = date ?: java.time.LocalDate.now()
         require(!target.isAfter(java.time.LocalDate.now().plusDays(1))) {
             "일일 운세는 내일까지만 조회할 수 있습니다: $target"
@@ -102,7 +112,8 @@ class SajuReadingService(
         val saju = sajuCalculator.calculate(input)
         val data = wongukData(saju)
         val ilun = ilunCalculator.analyze(saju, data.gyeokGuk, target)
-        val result = cachedGenerate(ReadingPromptBuilder.buildDaily(data, ilun), ReadingKind.DAILY)
+        val prompt = withLanguage(ReadingPromptBuilder.buildDaily(data, ilun), lang)
+        val result = cachedGenerate(prompt, ReadingKind.DAILY)
 
         // 첫 줄 = 포토카드 한 줄, 나머지 = 메시지 (프롬프트가 강제하는 형식)
         val lines = result.reading.trim().lines()
@@ -124,14 +135,20 @@ class SajuReadingService(
     }
 
     // 연간 운세 요약 — 점수는 엔진, 요약문(5카테고리+12개월)은 LLM 1회 호출로 일괄 생성
-    fun getYearlySummary(input: BirthInput, year: Int): YearlySummaryResult {
+    fun getYearlySummary(
+        input: BirthInput,
+        year: Int,
+        lang: ReadingLanguage = ReadingLanguage.KO,
+    ): YearlySummaryResult {
         val saju = sajuCalculator.calculate(input)
         val data = wongukData(saju)
         val fortune = fortuneService.fortuneOfYear(saju, year)
         val categoryScores = yearlySummaryCalculator.categoryScores(saju, data.gyeokGuk, fortune.seun)
         val monthScores = yearlySummaryCalculator.monthScores(data.gyeokGuk, fortune.wolunList)
 
-        val prompt = ReadingPromptBuilder.buildYearlySummary(data, fortune, categoryScores, monthScores)
+        val prompt = withLanguage(
+            ReadingPromptBuilder.buildYearlySummary(data, fortune, categoryScores, monthScores), lang
+        )
         val result = cachedGenerate(prompt, ReadingKind.YEARLY, validate = ::parseSummaryJson)
         val (categoryTexts, monthTexts) = parseSummaryJson(result.reading)
 
@@ -147,6 +164,18 @@ class SajuReadingService(
             cacheKey = result.cacheKey,
         )
     }
+
+    // ko는 프롬프트를 건드리지 않아 기존 캐시 키가 그대로 유효하다.
+    // 타 언어는 지시가 덧붙어 캐시 키가 언어별로 자동 분리된다.
+    private fun withLanguage(prompt: String, lang: ReadingLanguage): String =
+        if (lang == ReadingLanguage.KO) prompt
+        else prompt + "\n\n" + """
+            [출력 언어]
+            모든 출력 텍스트를 ${lang.english}(${lang.code})로 작성하세요.
+            - 형식 지시(줄 구조, JSON 키, 마크다운 구조)는 절대 바꾸지 말고 텍스트 내용만 해당 언어로.
+            - 간지·한자 표기는 그대로 두고, 명리 용어는 해당 언어 독자가 이해할 수 있게 풀어서.
+            - 분량 지시의 글자 수는 해당 언어에서 비슷한 정보량이 되도록 자연스럽게 환산.
+        """.trimIndent()
 
     // LLM JSON 파싱 + 완전성 검증 — 실패 시 예외 (검증 통과 전에는 캐시에 저장되지 않는다)
     private fun parseSummaryJson(content: String): Pair<Map<FortuneCategory, String>, Map<Int, String>> {

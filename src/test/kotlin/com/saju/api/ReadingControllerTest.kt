@@ -118,6 +118,31 @@ class ReadingControllerTest(
     }
 
     @Test
+    fun `lang 파라미터 - 지원 언어는 200`() {
+        given(generator.generate(anyString())).willReturn("English reading...")
+
+        mockMvc.post("/api/v1/saju/reading?lang=en") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.reading") { value(containsString("English")) }
+        }
+    }
+
+    @Test
+    fun `미지원 lang - 400과 사용 가능 값 안내`() {
+        mockMvc.post("/api/v1/saju/reading?lang=fr") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.message") { value(containsString("fr")) }
+            jsonPath("$.message") { value(containsString("ko")) }
+        }
+    }
+
+    @Test
     fun `잘못된 topic - 400과 사용 가능 값 안내`() {
         mockMvc.post("/api/v1/saju/reading/2026?topic=luck") {
             contentType = MediaType.APPLICATION_JSON
