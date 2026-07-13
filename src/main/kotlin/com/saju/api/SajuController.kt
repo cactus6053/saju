@@ -83,6 +83,25 @@ class SajuController(
     }
 
     @Operation(
+        summary = "연간 운세 요약 (FE 카드 UI용)",
+        description = "카테고리 5종(종합·금전·애정·건강·직업)과 월별 12개의 점수(1~5, 엔진 결정적 산출)와 " +
+            "짧은 요약문(LLM 일괄 생성, DB 영구 캐싱)을 반환합니다.",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "조회 성공"),
+        ApiResponse(responseCode = "400", description = "잘못된 입력 또는 출생 이전·범위 밖 연도"),
+        ApiResponse(responseCode = "502", description = "LLM 응답 형식 오류 (재시도 후에도 실패)"),
+        ApiResponse(responseCode = "503", description = "LLM 미구성 + 캐시 미스"),
+    )
+    @PostMapping("/fortune/{year}/summary")
+    fun yearlySummary(
+        @RequestBody request: BirthRequest,
+        @Parameter(description = "조회 연도", example = "2026")
+        @PathVariable year: Int,
+    ): YearlySummaryResponse =
+        readingService.getYearlySummary(request.toBirthInput(), year).toDto()
+
+    @Operation(
         summary = "일일 운세",
         description = "해당 날짜의 일진·점수(1~5)·행운 요소는 엔진이 결정적으로 계산하고, " +
             "한 줄 운세와 메시지만 LLM이 생성합니다 (DB 영구 캐싱). 미래 날짜는 내일까지만 허용됩니다.",

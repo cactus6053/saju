@@ -4,6 +4,7 @@ import com.saju.analysis.ElementStrengthAnalyzer
 import com.saju.analysis.FortuneService
 import com.saju.analysis.GyeokGukResult
 import com.saju.analysis.IlunCalculator
+import com.saju.analysis.YearlySummaryCalculator
 import com.saju.analysis.PillarRelation
 import com.saju.analysis.SinSalHit
 import com.saju.analysis.SipSeongAnalyzer
@@ -198,6 +199,47 @@ object ReadingPromptBuilder {
             - 빈 줄 하나
             - 이후: 오늘의 메시지 2~4문장 (200~350자), 완결된 문장으로 끝낼 것
             마크다운 헤더·목록 없이 순수 문장만 출력합니다.
+            """.trimIndent()
+        )
+    }
+
+    // ── 연간 운세 요약 (FE 카드 UI용 구조화 JSON) ──────────────────────
+
+    // 점수는 엔진(YearlySummaryCalculator)이 결정 — LLM은 점수 기조에 맞는 요약문만 생성
+    fun buildYearlySummary(
+        data: WongukData,
+        fortune: FortuneService.YearlyFortune,
+        categoryScores: List<YearlySummaryCalculator.CategoryScore>,
+        monthScores: List<YearlySummaryCalculator.MonthScore>,
+    ): String = buildString {
+        append(wongukBlock(data))
+        appendLine()
+        appendLine("[${fortune.year}년 세운] ${fortune.seun.ganJi.hanja} " +
+            "${fortune.seun.ganSipSeong.hangul}/${fortune.seun.jiSipSeong.hangul} " +
+            "원국관계: " + formatUnRelations(fortune.seun.relationsWithWonguk))
+        appendLine()
+        appendLine("[카테고리 점수(5점 만점)] " +
+            categoryScores.joinToString(" ") { "${it.category.name}:${it.score}" })
+        appendLine()
+        appendLine("[월별] 간지 십성 점수 원국관계")
+        fortune.wolunList.zip(monthScores).forEach { (w, s) ->
+            appendLine(
+                "  ${w.month}월 ${w.ganJi.hanja} ${w.ganSipSeong.hangul}/${w.jiSipSeong.hangul} " +
+                    "${s.score}점 " + formatUnRelations(w.relationsWithWonguk)
+            )
+        }
+        appendLine()
+        append(
+            """
+            위 데이터를 근거로 ${fortune.year}년 운세 요약을 작성하세요.
+
+            - categories: 5개 카테고리별 요약 1~2문장(40~90자). 주어진 점수의 기조와
+              일치시킬 것 (2점은 조심, 5점은 순풍). LOVE는 성별(위 원국의 성별) 기준
+              이성운, HEALTH는 의학적 단정 금지.
+            - months: 1~12월 각각 요약 1문장(25~60자). 간지 십성과 합충을 근거로.
+
+            아래 JSON 형식으로만 출력하세요. 코드펜스·설명문 없이 순수 JSON 하나만:
+            {"categories":{"OVERALL":"...","MONEY":"...","LOVE":"...","HEALTH":"...","CAREER":"..."},"months":{"1":"...","2":"...","3":"...","4":"...","5":"...","6":"...","7":"...","8":"...","9":"...","10":"...","11":"...","12":"..."}}
             """.trimIndent()
         )
     }

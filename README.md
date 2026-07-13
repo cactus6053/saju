@@ -168,10 +168,10 @@ curl -X POST localhost:9600/api/v1/saju/daeun \
 
 10개 대운의 간지·나이 구간과 각 대운-원국 관계를 반환합니다.
 
-### 4. LLM 해석 API 5종
+### 4. LLM 해석 API 6종
 
 계산 API가 반환하는 데이터(JSON)는 FE의 만세력 화면 렌더링용이고, 사용자가 읽을
-해석문은 아래 5종이 담당합니다. Claude(Haiku)가 엔진 계산값만 근거로 생성하며,
+해석문은 아래 6종이 담당합니다. Claude(Haiku)가 엔진 계산값만 근거로 생성하며,
 결과는 MariaDB에 영구 캐싱됩니다.
 
 | 엔드포인트 | 해석 | 내용 |
@@ -182,6 +182,7 @@ curl -X POST localhost:9600/api/v1/saju/daeun \
 | `POST /api/v1/saju/reading/{year}` | 연도별 운세 | 세운 주제, 대운·원국 관계, 삼재, 월별 흐름 |
 | `POST /api/v1/saju/reading/{year}?topic=` | 주제별 운세 | `money`(금전) · `career`(직장) · `health`(건강) · `love`(애정) |
 | `POST /api/v1/saju/fortune/daily?date=` | 일일 운세 | 일진·점수(1~5)·행운 요소는 엔진 계산, 한 줄 운세·메시지만 LLM. 미래는 내일까지 |
+| `POST /api/v1/saju/fortune/{year}/summary` | 연간 운세 요약 | 카테고리 5종(종합·금전·애정·건강·직업)+월별 12개 — 점수는 엔진, 요약문은 LLM 일괄 생성(JSON) |
 
 요청 본문은 계산 API와 동일한 `BirthRequest`입니다.
 

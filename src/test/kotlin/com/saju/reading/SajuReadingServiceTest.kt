@@ -254,6 +254,64 @@ class SajuReadingServiceTest(
         verify(generator, times(1)).generate(anyString())
     }
 
+    // ── 연간 운세 요약 ─────────────────────────────────────────────────
+
+    private fun validSummaryJson(): String {
+        val categories = com.saju.analysis.FortuneCategory.entries
+            .joinToString(",") { "\"${it.name}\":\"${it.hangul} 요약\"" }
+        val months = (1..12).joinToString(",") { "\"$it\":\"${it}월 요약\"" }
+        return """{"categories":{$categories},"months":{$months}}"""
+    }
+
+    @Test
+    fun `연간 요약 - 카테고리 5종과 월 12개 파싱, 캐싱 동작`() {
+        given(generator.generate(anyString())).willReturn(validSummaryJson())
+
+        val first = service.getYearlySummary(input, 2026)
+        val second = service.getYearlySummary(input, 2026)
+
+        assertEquals(5, first.categories.size)
+        assertEquals(12, first.months.size)
+        assertEquals("종합 요약", first.categories.first().summary)
+        assertEquals("3월 요약", first.months[2].summary)
+        first.categories.forEach { assertTrue(it.score in 1..5) }
+        first.months.forEach { assertTrue(it.score in 1..5) }
+        assertFalse(first.cached)
+        assertTrue(second.cached)
+        verify(generator, times(1)).generate(anyString())
+    }
+
+    @Test
+    fun `연간 요약 - 코드펜스로 감싼 JSON도 파싱`() {
+        given(generator.generate(anyString())).willReturn("```json\n${validSummaryJson()}\n```")
+
+        val result = service.getYearlySummary(input, 2026)
+        assertEquals(5, result.categories.size)
+    }
+
+    @Test
+    fun `연간 요약 - 잘못된 응답은 1회 재시도 후 성공하면 정상 반환`() {
+        given(generator.generate(anyString()))
+            .willReturn("JSON이 아닌 응답")
+            .willReturn(validSummaryJson())
+
+        val result = service.getYearlySummary(input, 2026)
+
+        assertEquals(12, result.months.size)
+        verify(generator, times(2)).generate(anyString())
+    }
+
+    @Test
+    fun `연간 요약 - 재시도도 실패하면 예외, 캐시에 저장 안 됨`() {
+        given(generator.generate(anyString())).willReturn("""{"categories":{},"months":{}}""")
+
+        assertThrows<ReadingGenerationException> {
+            service.getYearlySummary(input, 2026)
+        }
+        verify(generator, times(2)).generate(anyString())
+        assertEquals(0, repository.count())
+    }
+
     @Test
     fun `저장 시 kind가 종류별로 기록된다`() {
         given(generator.generate(anyString())).willReturn("한 줄\n\n메시지")

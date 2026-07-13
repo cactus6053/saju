@@ -194,6 +194,41 @@ class ReadingControllerTest(
     }
 
     @Test
+    fun `연간 요약 - 카테고리와 월별 구조 반환`() {
+        val categories = listOf("OVERALL", "MONEY", "LOVE", "HEALTH", "CAREER")
+            .joinToString(",") { "\"$it\":\"$it 요약\"" }
+        val months = (1..12).joinToString(",") { "\"$it\":\"${it}월 요약\"" }
+        given(generator.generate(anyString()))
+            .willReturn("""{"categories":{$categories},"months":{$months}}""")
+
+        mockMvc.post("/api/v1/saju/fortune/2026/summary") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.year") { value(2026) }
+            jsonPath("$.categories.length()") { value(5) }
+            jsonPath("$.categories[0].category") { value("OVERALL") }
+            jsonPath("$.categories[0].categoryHangul") { value("종합") }
+            jsonPath("$.categories[0].score") { isNumber() }
+            jsonPath("$.months.length()") { value(12) }
+            jsonPath("$.months[0].month") { value(1) }
+            jsonPath("$.months[0].ganJi.hanja") { isNotEmpty() }
+            jsonPath("$.cached") { value(false) }
+        }
+    }
+
+    @Test
+    fun `연간 요약 - 출생 이전 연도는 400`() {
+        mockMvc.post("/api/v1/saju/fortune/1990/summary") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
+    @Test
     fun `일일 운세 - 잘못된 날짜 형식은 400`() {
         mockMvc.post("/api/v1/saju/fortune/daily?date=2026-13-99") {
             contentType = MediaType.APPLICATION_JSON

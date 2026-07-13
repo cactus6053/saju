@@ -281,3 +281,35 @@ fun SajuReadingService.DailyReadingResult.toDto() = DailyFortuneResponse(
     ),
     cached = cached,
 )
+
+data class CategorySummaryDto(
+    val category: String,
+    val categoryHangul: String,
+    val score: Int,
+    val summary: String,
+)
+
+data class MonthSummaryDto(
+    val month: Int,
+    val ganJi: GanJiDto,
+    val score: Int,
+    val summary: String,
+)
+
+data class YearlySummaryResponse(
+    val year: Int,
+    val categories: List<CategorySummaryDto>,
+    val months: List<MonthSummaryDto>,
+    val cached: Boolean,
+)
+
+fun SajuReadingService.YearlySummaryResult.toDto() = YearlySummaryResponse(
+    year = year,
+    categories = categories.map {
+        CategorySummaryDto(it.category.name, it.category.hangul, it.score, it.summary)
+    },
+    months = months.map {
+        MonthSummaryDto(it.month, it.ganJi.toDto(), it.score, it.summary)
+    },
+    cached = cached,
+)

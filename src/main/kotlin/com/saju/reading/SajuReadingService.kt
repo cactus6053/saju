@@ -1,6 +1,8 @@
 package com.saju.reading
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.saju.analysis.ElementStrengthAnalyzer
+import com.saju.analysis.FortuneCategory
 import com.saju.analysis.FortuneService
 import com.saju.analysis.GyeokGukAnalyzer
 import com.saju.analysis.IlunCalculator
@@ -8,6 +10,8 @@ import com.saju.analysis.RelationAnalyzer
 import com.saju.analysis.SinSalAnalyzer
 import com.saju.analysis.SipSeongAnalyzer
 import com.saju.analysis.UnSeongAnalyzer
+import com.saju.analysis.YearlySummaryCalculator
+import com.saju.domain.core.GanJi
 import com.saju.engine.BirthInput
 import com.saju.engine.DaeunStartCalculator
 import com.saju.engine.SajuCalculator
@@ -28,6 +32,8 @@ class SajuReadingService(
     private val relationAnalyzer: RelationAnalyzer,
     private val fortuneService: FortuneService,
     private val ilunCalculator: IlunCalculator,
+    private val yearlySummaryCalculator: YearlySummaryCalculator,
+    private val objectMapper: ObjectMapper,
 ) {
 
     private val unSeongAnalyzer = UnSeongAnalyzer()
@@ -106,6 +112,63 @@ class SajuReadingService(
         return DailyReadingResult(ilun, oneLiner, message, result.cached, result.cacheKey)
     }
 
+    data class YearlySummaryResult(
+        val year: Int,
+        val categories: List<CategorySummary>,
+        val months: List<MonthSummary>,
+        val cached: Boolean,
+        val cacheKey: String,
+    ) {
+        data class CategorySummary(val category: FortuneCategory, val score: Int, val summary: String)
+        data class MonthSummary(val month: Int, val ganJi: GanJi, val score: Int, val summary: String)
+    }
+
+    // 연간 운세 요약 — 점수는 엔진, 요약문(5카테고리+12개월)은 LLM 1회 호출로 일괄 생성
+    fun getYearlySummary(input: BirthInput, year: Int): YearlySummaryResult {
+        val saju = sajuCalculator.calculate(input)
+        val data = wongukData(saju)
+        val fortune = fortuneService.fortuneOfYear(saju, year)
+        val categoryScores = yearlySummaryCalculator.categoryScores(saju, data.gyeokGuk, fortune.seun)
+        val monthScores = yearlySummaryCalculator.monthScores(data.gyeokGuk, fortune.wolunList)
+
+        val prompt = ReadingPromptBuilder.buildYearlySummary(data, fortune, categoryScores, monthScores)
+        val result = cachedGenerate(prompt, ReadingKind.YEARLY, validate = ::parseSummaryJson)
+        val (categoryTexts, monthTexts) = parseSummaryJson(result.reading)
+
+        return YearlySummaryResult(
+            year = year,
+            categories = categoryScores.map {
+                YearlySummaryResult.CategorySummary(it.category, it.score, categoryTexts.getValue(it.category))
+            },
+            months = monthScores.map {
+                YearlySummaryResult.MonthSummary(it.month, it.ganJi, it.score, monthTexts.getValue(it.month))
+            },
+            cached = result.cached,
+            cacheKey = result.cacheKey,
+        )
+    }
+
+    // LLM JSON 파싱 + 완전성 검증 — 실패 시 예외 (검증 통과 전에는 캐시에 저장되지 않는다)
+    private fun parseSummaryJson(content: String): Pair<Map<FortuneCategory, String>, Map<Int, String>> {
+        val json = content.trim()
+            .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+
+        val root = runCatching { objectMapper.readTree(json) }
+            .getOrElse { throw ReadingGenerationException("연간 요약 JSON 파싱 실패: ${it.message}") }
+
+        val categories = FortuneCategory.entries.associateWith { category ->
+            root.path("categories").path(category.name).asText("").trim().ifEmpty {
+                throw ReadingGenerationException("연간 요약에 ${category.name} 항목이 없습니다")
+            }
+        }
+        val months = (1..12).associateWith { month ->
+            root.path("months").path(month.toString()).asText("").trim().ifEmpty {
+                throw ReadingGenerationException("연간 요약에 ${month}월 항목이 없습니다")
+            }
+        }
+        return categories to months
+    }
+
     private fun wongukData(saju: SajuResult) = ReadingPromptBuilder.WongukData(
         saju = saju,
         sipSeong = sipSeongAnalyzer.analyze(saju),
@@ -116,15 +179,28 @@ class SajuReadingService(
         wongukRelations = relationAnalyzer.analyze(saju),
     )
 
-    // DB에 있으면 그대로 반환, 없으면 LLM 1회 생성 후 영구 저장
-    private fun cachedGenerate(prompt: String, kind: ReadingKind): ReadingResult {
+    // DB에 있으면 그대로 반환, 없으면 LLM 1회 생성 후 영구 저장.
+    // validate가 있으면 검증 통과분만 저장하며, 실패 시 1회 재생성 후 재검증한다.
+    private fun cachedGenerate(
+        prompt: String,
+        kind: ReadingKind,
+        validate: ((String) -> Unit)? = null,
+    ): ReadingResult {
         val cacheKey = sha256("${generator.model}\n$prompt")
 
         repository.findByCacheKey(cacheKey)?.let {
             return ReadingResult(it.content, it.model, cached = true, cacheKey = cacheKey)
         }
 
-        val content = generator.generate(prompt)
+        var content = generator.generate(prompt)
+        if (validate != null) {
+            try {
+                validate(content)
+            } catch (e: ReadingGenerationException) {
+                content = generator.generate(prompt)
+                validate(content) // 재시도도 실패하면 저장 없이 전파
+            }
+        }
         save(cacheKey, content, kind)
         return ReadingResult(content, generator.model, cached = false, cacheKey = cacheKey)
     }

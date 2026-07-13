@@ -7,6 +7,7 @@ import com.saju.analysis.IlunCalculator
 import com.saju.analysis.RelationAnalyzer
 import com.saju.analysis.SinSalAnalyzer
 import com.saju.analysis.SipSeongAnalyzer
+import com.saju.analysis.YearlySummaryCalculator
 import com.saju.engine.SajuCalculator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -37,4 +38,7 @@ class EngineConfig {
 
     @Bean
     fun ilunCalculator() = IlunCalculator()
+
+    @Bean
+    fun yearlySummaryCalculator() = YearlySummaryCalculator()
 }

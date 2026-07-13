@@ -41,11 +41,6 @@ class IlunCalculator(
     )
 
     companion object {
-        private val FAVORABLE = setOf(
-            RelationType.GAN_HAP, RelationType.YUK_HAP,
-            RelationType.SAM_HAP, RelationType.BAN_HAP, RelationType.BANG_HAP,
-        )
-
         // 개운색은 용신 오행의 오방색 (보라는 FE 팔레트 호환용으로만 존재)
         private val ELEMENT_COLOR = mapOf(
             Element.WOOD to LuckyColor.GREEN,
@@ -86,25 +81,11 @@ class IlunCalculator(
         )
     }
 
-    // 용신 오행 일치(천간 +2, 지지 +2, 조후 각 +1)와 합충 개수(합 +1, 충형파해 -1)를
-    // 합산해 1~5로 매핑. LLM에 맡기지 않는 결정적 규칙 — 재현성·캐시 안정성 목적.
+    // 용신 오행 일치와 합충 개수(합 +1, 충형파해 -1)를 합산해 1~5로 매핑 —
+    // FortuneScore의 공통 규칙 (연간 요약의 월별 점수와 동일 기준)
     private fun score(ganJi: GanJi, gyeokGuk: GyeokGukResult, relations: List<UnRelation>): Int {
-        var points = 0
-        if (ganJi.gan.element == gyeokGuk.yongsin) points += 2
-        if (ganJi.ji.element == gyeokGuk.yongsin) points += 2
-        gyeokGuk.johuYongsin?.let { johu ->
-            if (ganJi.gan.element == johu) points += 1
-            if (ganJi.ji.element == johu) points += 1
-        }
-        relations.forEach { points += if (it.type in FAVORABLE) 1 else -1 }
-
-        return when {
-            points <= -2 -> 1
-            points == -1 -> 2
-            points <= 1 -> 3
-            points <= 3 -> 4
-            else -> 5
-        }
+        val balance = relations.count { it.type in FortuneScore.FAVORABLE } * 2 - relations.size
+        return FortuneScore.of(FortuneScore.yongsinPoints(ganJi, gyeokGuk) + balance)
     }
 
     // 용신 오행의 하도 수리 쌍에서 일진 순서(60갑자 index) 홀짝으로 택일 — 날마다 교대
